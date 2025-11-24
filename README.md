@@ -138,4 +138,3 @@ All other code in this repository follows the same license for compatibility.
 * Neo4j
 * OpenAI / GPT-4o-mini
 
-If you build on this project, attribution is appreciated!
