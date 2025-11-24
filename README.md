@@ -9,5 +9,7 @@ Making LLM-DataBase
 - MD -> Neo4j
 - Use GPT4o-mini
 
-# Your API Key
+# Your API Key in
+.zshrc
+
 source ~/.zshrc
