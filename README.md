@@ -2,7 +2,7 @@
 Making LLM-DataBase
 
 # crystallizer.py
-- XML -> MD
+- TEI.xml -> MD
 - USE OpenAIEmbedding text-embedding-3-large
 
 # llmn.py
