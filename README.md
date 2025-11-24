@@ -1,7 +1,7 @@
 # Crystal-Evoluder
 Making LLM-DataBase
 
-# crystallizer
+# crystallizer.py
 - XML -> MD
 - USE OpenAIEmbedding text-embedding-3-large
 
