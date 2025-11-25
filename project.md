@@ -15,7 +15,8 @@
   <br>
 現状は“ノードとトリプル抽出” までやるけど、
 ### ノード名の正規化
-GPT-4o-miniにプロンプトで「同義語/略語を検知してマージ」させる。embeddingで類似スコア計算（cosine similarity > 0.85でクラスタ）。<br>
+GPT-4o-miniにプロンプトで「同義語/略語を検知してマージ」させる。<br>
+embeddingで類似スコア計算（cosine similarity > 0.85でクラスタ）。<br>
 Neo4j GDSのk-meansクラスタリング+embeddingで、FastRP/node2vecが専門用語のsemanticを保持（精度85-90%）。<br>
 GPT-4o-miniのfew-shotプロンプトでドメイン知識注入（e.g. "CS論文ではGNN=Graph Neural Network"）。<br>
 reguloGPTで分子経路のエンティティ正規化成功率92%。<br>
