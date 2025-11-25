@@ -1,4 +1,4 @@
-# Crystal-Evoluder
+# Crystal-Evoluder　α
 
 **TEI.xml → Markdown → Neo4j Graph DB Pipeline (LLM-powered)**
 Transform structured PDFs into machine-readable knowledge graphs.
