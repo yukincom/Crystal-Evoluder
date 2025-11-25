@@ -1,4 +1,18 @@
+# 開発計画
+- 二つのファイルの結合
+- Grobid統合
+- PDF以外のデータ
+- バッチ処理
+- ログの階層化
+- エラーリカバリ
+- Neo4jスキーマ
+- Data Provenance
+- エクスポート拡張プラグイン
+- obsidian　→　DB化　syncのプラグイン
+- Markdown粒度調節
 ## AI で補完する “ラベル付けモジュール”
+これは難しそう。私の手には負えないかも。。。
+  <br>
 現状は“ノードとトリプル抽出” までやるけど、
 ### ノード名の正規化
 GPT-4o-miniにプロンプトで「同義語/略語を検知してマージ」させる。embeddingで類似スコア計算（cosine similarity > 0.85でクラスタ）。<br>
@@ -32,3 +46,13 @@ def label_normalization_module(index, llm=OpenAI(model="gpt-4o-mini")):<br>
   unified = llm.predict(prompt=f"Unify relations: {relations} into 10 categories.")<br>
 4. Neo4jにupsert
   return updated_index
+
+## 将来的に、エクスポート先を増やしたい。
+### 推奨（セット済み）
+- Neo4j
+### プラグインで任意（後で作る。差し込む場所だけ作った。）
+- JSON-LD（汎用）
+- Blazegraph（RDF 系）
+- PuppyGraph（分散高性能が欲しい人向け）
+- Stardog（商用なので optional） 
+- GroundX On-Prem(企業向けなので、要望があったら)
