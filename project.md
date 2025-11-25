@@ -2,6 +2,12 @@
 - 二つのファイルの結合　✅　11/25
 - Grobid統合
 - PDF以外のデータ
+  ✅ TEI (.tei.xml)
+  ✅ Markdown (.md) - frontmatter対応、見出し分割
+  ✅ DOCX (.docx) - 見出しスタイル検出
+  ✅ HTML (.html) - trafilatura + BeautifulSoup
+  ✅ TXT (.txt) - SemanticChunker対応
+  ✅ フォーマット自動判定
 - バッチ処理
 - ログの階層化
 - エラーリカバリ
