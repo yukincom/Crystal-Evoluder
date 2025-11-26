@@ -1,15 +1,15 @@
 # 開発計画
 - 二つのファイルの結合　✅　11/25
 - Grobid統合
-- PDF以外のデータ
-  ✅ TEI (.tei.xml)
-  ✅ Markdown (.md) - frontmatter対応、見出し分割
-  ✅ DOCX (.docx) - 見出しスタイル検出
-  ✅ HTML (.html) - trafilatura + BeautifulSoup
-  ✅ TXT (.txt) - SemanticChunker対応
-  ✅ フォーマット自動判定
-- バッチ処理
-- ログの階層化
+- PDF以外のデータ ✅  11/26
+  ✅ TEI (.tei.xml)<br>
+  ✅ Markdown (.md) - frontmatter対応、見出し分割<br>
+  ✅ DOCX (.docx) - 見出しスタイル検出<br>
+  ✅ HTML (.html) - trafilatura + BeautifulSoup<br>
+  ✅ TXT (.txt) - SemanticChunker対応<br>
+  ✅ フォーマット自動判定<br>
+- バッチ処理 ✅  11/26
+- ログの階層化 ✅  11/26
 - エラーリカバリ
 - Neo4jスキーマ
 - Data Provenance
@@ -17,9 +17,8 @@
 - obsidian　→　DB化　syncのプラグイン
 - Markdown粒度調節
 ## AI で補完する “ラベル付けモジュール”
-これは難しそう。私の手には負えないかも。。。
-  <br>
-現状は“ノードとトリプル抽出” までやるけど、
+これは難しそう。私の手には負えないかも。。。<br>
+現状は“ノードとトリプル抽出” までやるけど、下手すると、情報が歪むかも・・・。<br>
 ### ノード名の正規化
 GPT-4o-miniにプロンプトで「同義語/略語を検知してマージ」させる。<br>
 embeddingで類似スコア計算（cosine similarity > 0.85でクラスタ）。<br>
