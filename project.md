@@ -1,13 +1,13 @@
 # 開発計画
 - 二つのファイルの結合　✅　11/25
 - Grobid統合
-- PDF以外のデータ ✅  11/26
-  ✅ TEI (.tei.xml)<br>
-  ✅ Markdown (.md) - frontmatter対応、見出し分割<br>
-  ✅ DOCX (.docx) - 見出しスタイル検出<br>
-  ✅ HTML (.html) - trafilatura + BeautifulSoup<br>
-  ✅ TXT (.txt) - SemanticChunker対応<br>
-  ✅ フォーマット自動判定<br>
+- PDF以外のデータ ✅  11/26<br>
+   TEI (.tei.xml)<br>
+   Markdown (.md) - frontmatter対応、見出し分割<br>
+   DOCX (.docx) - 見出しスタイル検出<br>
+   HTML (.html) - trafilatura + BeautifulSoup<br>
+   TXT (.txt) - SemanticChunker対応<br>
+   フォーマット自動判定<br>
 - バッチ処理 ✅  11/26
 - ログの階層化 ✅  11/26
 - エラーリカバリ
