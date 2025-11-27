@@ -4,20 +4,27 @@ Knowledge Crystallization System
 
 """
 
-from bs4 import BeautifulSoup
-from llama_index.core import Document, KnowledgeGraphIndex, StorageContext
-from llama_index.graph_stores.neo4j import Neo4jGraphStore
-from llama_index.llms.openai import OpenAI
-from llama_index.core.node_parser import SimpleNodeParser
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 import os
 import re
 import logging
 import concurrent.futures
 import time
+import json                                
+from datetime import datetime  
 from pathlib import Path
-from typing import Optional, List, Dict, Tuple
+from typing import Optional, List, Dict, Tuple,Any
 from contextlib import contextmanager
+
+import requests   
+from pathlib import Path
+from typing import List
+from bs4 import BeautifulSoup
+
+from llama_index.core import Document, KnowledgeGraphIndex, StorageContext
+from llama_index.graph_stores.neo4j import Neo4jGraphStore
+from llama_index.llms.openai import OpenAI
+from llama_index.core.node_parser import SimpleNodeParser
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 
 # 追加パッケージ（オプション）
 try:
@@ -55,6 +62,15 @@ try:
 except ImportError:
     HAS_TRAFILATURA = False
     print("⚠️  trafilatura not installed (HTML extraction limited)")
+
+
+try:
+    from tqdm import tqdm
+    HAS_TQDM = True
+
+except ImportError:
+    HAS_TQDM = False
+    print("⚠️  tqdm not installed (progress bar disabled)")
 
 
 def collect_files(target_dir: str, allowed_ext: List[str]) -> List[str]:
@@ -121,12 +137,15 @@ class CrystalEvoluder:
         self.crystal = None
         self.metadata = {}
         self.logger = self._setup_logger(log_level)
-        self.grobid_client = None
-        self.hlogger = HierarchicalLogger(self.logger)        
-        # Grobid設定
-        if self.config.get('enable_grobid', False):
-            self._init_grobid()
 
+        self.grobid_url = self.config.get('grobid_url', 'http://localhost:8070')
+        self.grobid_available = self._check_grobid()
+
+        if self.grobid_available:
+            self.logger.info(f"✅ Grobid server available at {self.grobid_url}")
+        else:
+            self.logger.warning("⚠️  Grobid server not available (PDF support disabled)")
+        
         self.logger.info("Crystal Evoluder v1.1 initialized")
 
     def _setup_logger(self, level: int) -> logging.Logger:
@@ -134,19 +153,31 @@ class CrystalEvoluder:
         logger = logging.getLogger('CrystalEvoluder')
         logger.setLevel(level)
         logger.handlers.clear()        
-        console = logging.StreamHandler()       
+
+        console = logging.StreamHandler()    
+
         class IconFormatter(logging.Formatter):
             ICONS = {'DEBUG': '🔍', 'INFO': '✨', 'WARNING': '⚠️', 'ERROR': '❌', 'CRITICAL': '💥'}
             def format(self, record):
                 icon = self.ICONS.get(record.levelname, 'ℹ️')
                 record.icon = icon
                 return super().format(record)       
+            
         console.setFormatter(IconFormatter('%(icon)s %(message)s'))
         logger.addHandler(console)        
+
         file_handler = logging.FileHandler('crystal_evoluder.log', encoding='utf-8')
         file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
         logger.addHandler(file_handler)        
         return logger
+
+    def _check_grobid(self) -> bool:
+        """Grobidサーバーが起動しているか確認"""
+        try:
+            response = requests.get(f"{self.grobid_url}/api/isalive", timeout=2)
+            return response.status_code == 200
+        except:
+            return False
 
     def _init_grobid(self):
             """Grobidクライアント初期化"""
@@ -161,93 +192,195 @@ class CrystalEvoluder:
     def _parse_pdf(self, pdf_path: Path) -> List[Document]:
         """PDF → GROBID → TEI → Document"""
         if not self.grobid_client:
-            raise RuntimeError("Grobid not enabled. Set 'enable_grobid': True in config")
+            raise RuntimeError(
+                f"Grobid server not available at {self.grobid_url}\n"
+                "Start your Grobid server first"
+)
         
         with self._safe_parse('pdf', pdf_path):
             # TEI出力先
             tei_path = pdf_path.with_suffix('.tei.xml')
-            
-            # Grobid処理
-            self.logger.info(f"Processing PDF with Grobid: {pdf_path.name}")
-            self.grobid_client.process(
-                'processFulltextDocument',
-                str(pdf_path),
-                output=str(tei_path.parent),
-                consolidate_citations=True,
-                consolidate_header=True,
-                include_raw_citations=False,
-                include_raw_affiliations=False,
-                tei_coordinates=False,
-                segment_sentences=False
-            )
-            # 既存のTEIパーサーで処理
+
             if tei_path.exists():
+                self.logger.info(f"Using cached TEI: {tei_path.name}")
                 return self._parse_tei(tei_path)
-            else:
-                raise FileNotFoundError(f"Grobid output not found: {tei_path}")
+
+            # Grobid処理
+            max_retries = 3
+            for attempt in range(max_retries):    
+                try:
+                    self.logger.info(
+                        f"Processing PDF with Grobid: {pdf_path.name}"
+                        f"(attempt {attempt+1}/{max_retries})"
+                    )
+                
+                    self.grobid_client.process(
+                    'processFulltextDocument',
+                    str(pdf_path),
+                    output=str(tei_path.parent),
+                    consolidate_citations=True,
+                    consolidate_header=True,
+                    include_raw_citations=False,
+                    include_raw_affiliations=False,
+                    tei_coordinates=False,
+                    segment_sentences=False
+                    )  
+                    # 既存のTEIパーサーで処理
+                    if tei_path.exists():
+                        return self._parse_tei(tei_path)
+                    else:
+                        raise FileNotFoundError(f"Grobid output not found: {tei_path}")
+
+                except requests.exceptions.Timeout:
+                    self.logger.warning(f"⏱️  Timeout on attempt {attempt+1}")
+                    if attempt == max_retries - 1:
+                        raise RuntimeError("Grobid processing timeout")
+                    time.sleep(2 ** attempt)  # exponential backoff
+
+                except requests.exceptions.ConnectionError:
+                    self.logger.error("❌ Grobid server unreachable")
+                    raise RuntimeError(
+                        "Grobid server not responding. Check:\n"
+                        "1. Server is running: docker ps\n"
+                        "2. URL is correct: http://localhost:8070\n"
+                        "3. Restart: docker restart <container_id>"
+                    )
+
+                except Exception as e:
+                    self.logger.error(f"❌ Grobid processing failed: {e}")
+                    if attempt == max_retries - 1:
+                        raise
+                    time.sleep(2 ** attempt)
 
     def batch_crystallize(self, input_dir: str, 
                             patterns: List[str] = None,
-                            max_workers: int = 4,
-                            include_pdf: bool = None) -> Dict[str, List[Document]]:
+                            max_workers: int = 4) -> Dict[str, Any]:
+
             """
             ディレクトリ内のファイルを一括処理
         
-            Returns:
-                {filepath: [Document, ...], ...}
             Args:
                 include_pdf: Grobid有効時のみPDFを処理（None=自動判定）
+                fail_fast: True=最初のエラーで停止、False=全部試す
+            Returns:
+                {
+                'success': {filepath: [Document, ...], ...},
+                'failed': [(filepath, error_msg), ...],
+                'skipped': [filepath, ...],  # PDF skip等
+                'stats': {...}
+                }
             """
             if include_pdf is None:
-                include_pdf = self.grobid_client is not None
+                include_pdf = self.grobid_available
 
             if patterns is None:
                 patterns = patterns or ['*.md', '*.docx', '*.html', '*.txt', '*.tei.xml']
         
                 # Grobid有効時のみPDFを追加
-                if include_pdf:
+                if self.grobid_available:
                     patterns.append('*.pdf')
-                    self.logger.info("✅ PDF processing enabled (Grobid active)")
+                    self.logger.info("✅ PDF processing enabled (Grobid server active)")
                 else:
-                    self.logger.warning("⚠️  PDF skipped (Grobid not available)")
-
+                    self.logger.warning("⚠️  PDF skipped (Grobid server not available)")
+            # ファイル収集
             files = []        
             for pattern in patterns:
                 files.extend(Path(input_dir).rglob(pattern))
         
             self.logger.info(f"Found {len(files)} files")
-        
-            results = {}
-            failed = []
-        
+             # 処理結果
+            results = {
+                'success': {},
+                'failed': [],
+                'skipped': [],
+                'stats': {}
+            }
+            
+            # 並列処理
             with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-                future_to_file = {
-                    executor.submit(self._crystallize_with_retry, str(f)): f 
-                    for f in files
-                }           
+                future_to_file = {} 
+
+                for f in files:
+                    if f.suffix.lower() == '.pdf' and not include_pdf:
+                        results['skipped'].append(str(f))
+                        continue    
+                    future = executor.submit(self._crystallize_with_retry, str(f))
+                    future_to_file[future] = f
+
                 # プログレスバー追加
-                from tqdm import tqdm
-                for future in tqdm(
-                concurrent.futures.as_completed(future_to_file),
-                total=len(files),
-                desc="Processing"
-                ):
+                try:
+                    from tqdm import tqdm
+                    iterator = tqdm(
+                
+                        concurrent.futures.as_completed(future_to_file),
+                        total=len(future_to_file),
+                        desc="Crystallizing"
+                    )
+                except ImportError:
+                    iterator = concurrent.futures.as_completed(future_to_file)
+                # 結果収集
+                for future in iterator:
                     file_path = future_to_file[future]
                     try:
-                        docs = future.result()
+                        docs = future.result(timeout=300)
                         results[str(file_path)] = docs
+                    
+                    except concurrent.futures.TimeoutError:
+                        error_msg = "Processing timeout (>5min)"
+                        results['failed'].append((str(file_path), error_msg))
+                        self.logger.error(f"Failed: {file_path.name} : {error_msg}")
+                        if fail_fast:
+                            executor.shutdown(wait=False)
+                            break
+
                     except Exception as e:
-                        self.logger.error(f"Failed: {file_path} - {e}")
-                        failed.append((file_path, str(e)))
+                        error_msg = str(e)
+                        results['failed'].append((str(file_path), error_msg))
+                        self.logger.error(f"Failed: {file_path.name} : {error_msg}")
+                        if fail_fast:
+                            executor.shutdown(wait=False)
+                            break
+        # 統計情報
+            results['stats'] = {
+                'total': len(files),
+                'success': len(results['success']),
+                'failed': len(results['failed']),
+                'skipped': len(results['skipped']),
+                'total_documents': sum(len(docs) for docs in results['success'].values())
+        }            
         
             # サマリー
-            self.logger.info(f"✅ Success: {len(results)}, ❌ Failed: {len(failed)}")
+            self.logger.info(
+                f"✅ Batch complete: "
+                f"{results['stats']['success']} success, "
+                f"{results['stats']['failed']} failed, "
+                f"{results['stats']['skipped']} skipped"
+            )
         
-            if failed:
-                self._save_error_report(failed)
+        # 失敗レポート保存
+            if results['failed']:
+                self._save_error_report(results['failed'], input_dir)
         
             return results
+
+    def _save_error_report(self, failed: List[Tuple[str, str]], base_dir: str):
+        """エラーレポート保存"""
+        report_path = Path(base_dir) / 'crystal_evoluder_errors.json'
     
+        report = {
+            'timestamp': datetime.now().isoformat(),
+            'failed_files': [
+                {'file': filepath, 'error': error}
+                for filepath, error in failed
+            ]
+        }
+    
+        with open(report_path, 'w', encoding='utf-8') as f:
+            json.dump(report, f, indent=2, ensure_ascii=False)
+    
+        self.logger.info(f"📝 Error report saved: {report_path}")
+
+
     def _crystallize_with_retry(self, file_path: str, 
                                 max_retries: int = 3) -> List[Document]:
         """リトライ機構付き crystallize"""
@@ -257,7 +390,8 @@ class CrystalEvoluder:
             except Exception as e:
                 if attempt == max_retries - 1:
                     raise
-                self.logger.warning(f"Retry {attempt+1}/{max_retries}: {file_path}")
+                self.logger.warning(f"Retry {attempt+1}/{max_retries}: {file_path}\n"
+                                    f"  Error: {e}")
                 time.sleep(2 ** attempt)  # exponential backoff
 
     def crystallize(self, input_path: str, format: str = 'auto') -> List[Document]:
@@ -587,8 +721,6 @@ class CrystalEvoluder:
             self.metadata = {'title': title, 'authors': [authors] if isinstance(authors, str) else authors}
             self.logger.info(f"DOCX parsed: {len(documents)} sections")
             return documents
-    
-
 
     def _parse_html(self, html_path: Path) -> List[Document]:
         """HTMLをパース"""
@@ -601,9 +733,19 @@ class CrystalEvoluder:
                 extracted = trafilatura.extract(html_content, include_formatting=True)                
                 if extracted:
                     text = self._clean_text(extracted)
-                    self.metadata = {'title': html_path.stem, 'authors': ['Unknown']}
+                    title = html_path.stem
+
+                    soup = BeautifulSoup(html_content, 'html.parser')
+                    authors = self._extract_html_authors(soup)
+
+                    self.metadata = {'title': title, 'authors': authors}
                     self.logger.info("HTML parsed with trafilatura")
-                    return [Document(text=text, metadata={'title': html_path.stem, 'section': 'Main', 'source_format': 'html'})]
+                    return [Document(
+                        text=text, 
+                        metadata={'title': title, 'authors': ', '.join(authors),
+                        'section': 'Main',
+                        'source_format': 'html'}
+                    )]
 
             # 2) fallback BeautifulSoup
             soup = BeautifulSoup(html_content, 'html.parser')
@@ -611,28 +753,12 @@ class CrystalEvoluder:
             title = title_tag.get_text(strip=True) if title_tag else html_path.stem
 
             # 著者メタ情報取得
-            author_meta = soup.find('meta', attrs={'name': 'author'})
-            authors = [author_meta['content']] if author_meta and author_meta.get('content') else ['Unknown']
+            authors = self._extract_html_authors(soup) 
 
-            # try multiple author meta patterns
-            author = None
-            for meta_name in ('author', 'article:author', 'og:author', 'byline'):
-                m = soup.find('meta', attrs={'name': meta_name}) or soup.find('meta', attrs={'property': meta_name})
-                if m and m.get('content'):
-                    author = m.get('content').strip()
-                    break
-            if not author:
-                # try common selectors (e.g., <a rel="author">)
-                a = soup.find('a', rel='author')
-                if a and a.get_text(strip=True):
-                    author = a.get_text(strip=True)
-
-            authors = [author] if author else ['Unknown']
-            
             # 見出しと段落でセクション分割
             sections = []
             current_heading = "Introduction"
-            current_text = []
+            current_text = []        
 
             for element in soup.find_all(['h1', 'h2', 'h3', 'p']):
                 if element.name in ['h1', 'h2', 'h3']:
@@ -652,14 +778,42 @@ class CrystalEvoluder:
             for i, (heading, text) in enumerate(sections):
                 if len(text) >= 50:
                     documents.append(Document(
-                        text=text, 
-                        metadata={'title': title, 'authors': ', '.join(authors), 'section': heading, 'section_index': i, 'source_format': 'html'}))
+                        text=text,
+                        metadata={
+                            'title': title,
+                            'authors': ', '.join(authors),
+                            'section': heading,
+                            'section_index': i,
+                            'source_format': 'html'
+                        }
+                    ))
 
-            self.metadata = {'title': title, 'authors': ['authors']}
+            self.metadata = {'title': title, 'authors': authors}
             self.logger.info(f"HTML parsed: {len(documents)} sections")
             return documents
-    
 
+    def _extract_html_authors(self, soup: BeautifulSoup) -> List[str]:
+        """HTML から著者情報を抽出（共通メソッド）"""
+         # 複数のメタタグパターンを試す
+        for meta_name in ('author', 'article:author', 'og:author', 'byline'):
+            meta = soup.find('meta', attrs={'name': meta_name})
+            if not meta:
+                meta = soup.find('meta', attrs={'property': meta_name})
+        
+            if meta and meta.get('content'):
+                author = meta.get('content').strip()
+                if author:
+                    return [author]
+    
+        # rel="author" を試す
+        author_link = soup.find('a', rel='author')
+        if author_link:
+            author = author_link.get_text(strip=True)
+            if author:
+                return [author]
+    
+    # 見つからなければ Unknown
+        return ['Unknown']
 
     def evolve_to_notes(self, output_dir: str):
         """ノートに進化"""
