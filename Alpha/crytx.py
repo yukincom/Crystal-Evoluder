@@ -42,12 +42,12 @@ except ImportError:
     print("⚠️  ftfy not installed (text cleaning limited)")
 
 try:
-    from langchain_text_splitters import SemanticChunker
+    from langchain_experimental.text_splitter import SemanticChunker 
     from langchain_openai import OpenAIEmbeddings
     HAS_SEMANTIC_CHUNKER = True
 except ImportError:
     HAS_SEMANTIC_CHUNKER = False
-    print("⚠️  langchain-text-splitters not installed (using basic chunking)")
+    print("⚠️  langchain-experimental not installed (using basic chunking)")
 
 try:
     from docx import Document as DocxDocument
@@ -254,13 +254,16 @@ class CrystalEvoluder:
 
     def batch_crystallize(self, input_dir: str, 
                             patterns: List[str] = None,
-                            max_workers: int = 4) -> Dict[str, Any]:
+                            max_workers: int = 4,
+                            fail_fast: bool = False) -> Dict[str, Any]:
 
             """
             ディレクトリ内のファイルを一括処理
         
             Args:
                 include_pdf: Grobid有効時のみPDFを処理（None=自動判定）
+                patterns: ファイルパターン（例: ['*.md', '*.pdf']）
+                max_workers: 並列処理数
                 fail_fast: True=最初のエラーで停止、False=全部試す
             Returns:
                 {
@@ -279,7 +282,7 @@ class CrystalEvoluder:
                 # Grobid有効時のみPDFを追加
                 if self.grobid_available:
                     patterns.append('*.pdf')
-                    self.logger.info("✅ PDF processing enabled (Grobid server active)")
+                    self.logger.info("✅ PDF processing enabled")
                 else:
                     self.logger.warning("⚠️  PDF skipped (Grobid server not available)")
             # ファイル収集
@@ -307,7 +310,7 @@ class CrystalEvoluder:
                     future = executor.submit(self._crystallize_with_retry, str(f))
                     future_to_file[future] = f
 
-                # プログレスバー追加
+                # プログレスバー
                 try:
                     from tqdm import tqdm
                     iterator = tqdm(
@@ -635,12 +638,30 @@ class CrystalEvoluder:
                 content = f.read()
             
             content = self._clean_text(content)
-            
-            if HAS_SEMANTIC_CHUNKER:
-                splitter = SemanticChunker(OpenAIEmbeddings(), breakpoint_threshold_type="percentile")
+
+        # APIキーの取得（優先順位）
+        api_key = (
+            self.config.get('openai_api_key') or  # 1. 設定ファイル/引数
+            os.environ.get('OPENAI_API_KEY')      # 2. 環境変数（.zshrc）
+        )
+
+        # セマンティックチャンキング
+        if HAS_SEMANTIC_CHUNKER and api_key:
+            try:
+                os.environ['OPENAI_API_KEY'] = api_key
+                
+                self.logger.info("🤖 Using SemanticChunker")
+                embeddings = OpenAIEmbeddings()
+                splitter = SemanticChunker(embeddings, breakpoint_threshold_type="percentile")
                 chunks = splitter.split_text(content)
-            else:
+                self.logger.info(f"✅ {len(chunks)} semantic chunks created")
+            except Exception as e:
+                self.logger.warning(f"⚠️  SemanticChunker failed: {e}")
                 chunks = self._chunk_by_paragraphs(content)
+        else:
+            if HAS_SEMANTIC_CHUNKER and not self.config.get('openai_api_key'):
+                self.logger.info("ℹ️  OpenAI API key not provided, using basic chunking")
+            chunks = self._chunk_by_paragraphs(content)
             
             documents = []
             for i, chunk in enumerate(chunks):
@@ -874,15 +895,24 @@ if __name__ == "__main__":
     import argparse
     
     parser = argparse.ArgumentParser(description='Crystal Evoluder v1.1')
-    parser.add_argument('command', choices=['crystallize', 'evolve-notes', 'evolve-graph', 'evolve-all'])
-    parser.add_argument('input_file', help='Input file path')
-    parser.add_argument('--format', default='auto', help='File format (auto/tei/markdown/docx/html/txt)')
+    parser.add_argument('command', choices=[
+        'crystallize', 
+        'evolve-notes', 
+        'evolve-graph', 
+        'evolve-all',
+        'batch'  
+   ])
+
+    parser.add_argument('input_file', help='Input file or directory path')
+    parser.add_argument('--format', default='auto', help='File format (auto/tei/markdown/docx/html/txt/pdf)')
     parser.add_argument('--markdown-dir', default='~/CrystalEvoluder/Library')
     parser.add_argument('--neo4j-uri', default='bolt://localhost:7687')
     parser.add_argument('--neo4j-user', default='neo4j')
     parser.add_argument('--neo4j-pass')
     parser.add_argument('--debug', action='store_true')
-    
+    parser.add_argument('--max-workers', type=int, default=4, help='Parallel workers for batch')
+    parser.add_argument('--fail-fast', action='store_true', help='Stop on first error')
+
     args = parser.parse_args()
     
     print("🔮 Crystal Evoluder v1.1")
@@ -891,6 +921,30 @@ if __name__ == "__main__":
     evoluder = CrystalEvoluder(log_level=logging.DEBUG if args.debug else logging.INFO)
     evoluder.crystallize(args.input_file, format=args.format)
     
+    if args.command == 'crystallize':
+        evoluder.crystallize(args.input_file, format=args.format)
+
+    if args.command == 'batch':
+        results = evoluder.batch_crystallize(
+            args.input_file,
+            max_workers=args.max_workers,
+            fail_fast=args.fail_fast
+        )
+        
+        # 結果サマリー表示
+        print("\n" + "="*42)
+        print("📊 Batch Processing Results")
+        print("="*42)
+        print(f"✅ Success: {results['stats']['success']}")
+        print(f"❌ Failed:  {results['stats']['failed']}")
+        print(f"⏭️  Skipped: {results['stats']['skipped']}")
+        print(f"📄 Total documents: {results['stats']['total_documents']}")
+        
+        if results['failed']:
+            print("\n❌ Failed files:")
+            for filepath, error in results['failed'][:5]:  # 最初の5件
+                print(f"  - {Path(filepath).name}: {error[:50]}...")
+
     if args.command in ['evolve-notes', 'evolve-all']:
         evoluder.evolve_to_notes(args.markdown_dir)
     
