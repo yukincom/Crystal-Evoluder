@@ -24,9 +24,8 @@ from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 
 # 共通モジュール
 from shared.logger import setup_logger, HierarchicalLogger
-from shared.utils import load_path_dicts
-from shared.error_handler import ErrorCollector
-from shared.error_handler import safe_execute
+from shared.utils import load_and_validate_paths
+from shared.error_handler import ErrorCollector, safe_execute
 
 class CrystalCluster:
     """Crystal Cluster - Neo4j投入専用"""
@@ -42,8 +41,24 @@ class CrystalCluster:
         self.logger.info("Crystal Cluster v1.1 initialized")
 
 
-    def load_documents(self, json_path: str, raw_docs: Optional[List[str]] = None) -> List[Document]:
-        """JSON と 生テキスト両方から Document を作る"""
+    def load_documents(
+        self,
+        json_path: str,
+        raw_docs: Optional[List[str]] = None,
+        path_pickle: Optional[str] = None,
+        kg: Optional[nx.Graph] = None) -> List[Document]:
+        """
+        JSON と 生テキスト両方から Document を作る
+        
+        Args:
+            json_path: JSONファイルのパス
+            raw_docs: 生テキストのリスト（オプション）
+            path_pickle: パス情報のPickleファイル（オプション）
+            kg: ナレッジグラフ（パス情報統合時に必要）
+        
+        Returns:
+            Documentのリスト（パス情報が統合されている場合もある）
+        """
         documents = []
 
         # --- JSON 側 ---
@@ -84,21 +99,43 @@ class CrystalCluster:
             f"({json_count} from JSON, {raw_count} raw texts)"
         )
 
+        # --- パス情報の統合（オプション）---
+        if path_pickle and kg is not None:
+            path_dicts = load_and_validate_paths(path_pickle, self.logger)
+            if path_dicts:
+                self.logger.info("Augmenting documents with path information...")
+                documents = self.augment_documents_with_paths(
+                    documents, 
+                    path_dicts, 
+                    kg,
+                    entity_embeddings=getattr(self, 'entity_embeddings', None)
+                )
+                self.logger.info(f"✅ Path information added to {len(documents)} documents")
+            else:
+                self.logger.warning("Path information could not be loaded, continuing without it")
+
         return documents
 
     def augment_documents_with_paths(
+        self,
         documents: List[Document], 
         path_dicts: List[Dict], 
         kg: nx.Graph,
         entity_embeddings: Dict[str, np.ndarray] = None,
         match_key='question') -> List[Document]:
         """
-        documents: list of llama_index.core.Document（metadata に 'title' や 'section' が入っている場合もある）
-        path_dicts: load_path_dicts の戻り値（例: {match_key: ..., 'paths': [[n1,n2,...], ...]}）
-        match_key: documents と path_dicts を突き合わせるキー（質問文やファイル名など）
+        documents に対応する path 情報を注入
+        
+        Args:
+            documents: Documentのリスト
+            path_dicts: load_path_dicts の戻り値
+            kg: ナレッジグラフ
+            entity_embeddings: エンティティの埋め込み（オプション）
+            match_key: documents と path_dicts を突き合わせるキー
+        
+        Returns:
+            パス情報が追加された documents
 
-        この関数は、documents に対応する path 情報を注入する。
-        戻り値: 各 doc.metadata['paths'] に path 情報を追加した documents。
         """
         # defensive
         if entity_embeddings is None:
@@ -112,6 +149,8 @@ class CrystalCluster:
                 pd_map[key] = p
 
         augmented = []
+        matched_count = 0
+
         for doc in documents:
             meta = dict(getattr(doc, 'metadata', {}) or {})
             doc_key = meta.get(match_key)
@@ -119,18 +158,19 @@ class CrystalCluster:
             matched = None
             if doc_key is not None and doc_key in pd_map:
                 matched = pd_map[doc_key]
+                matched_count += 1
             else:
             # フォールバック：テキスト内に match_key の文字列が含まれる path_dict を探す
-            # （柔軟に照合したい場合に使う）
                 text = getattr(doc, 'text', '') or ''
                 for k, p in pd_map.items():
                     if isinstance(k, str) and k in text:
                         matched = p
+                        matched_count += 1
                         break
 
             paths_meta = []
             if matched:
-                for path in matched.get('paths', []):
+                for path in matched.get('translated_paths', []):
                 # path: list of node names (entities)
                     path_len = len(path)
                     edge_weights = []
@@ -166,17 +206,17 @@ class CrystalCluster:
                             s1, s2 = path[0], path[-1]
                             if kg.has_node(s1) and kg.has_node(s2):
                                 shortest = int(nx.shortest_path_length(kg, s1, s2))
-                    except nx.NetworkXNoPath:
-                        shortest = None
+                    except (nx.NetworkXNoPath, nx.NodeNotFound):
+                        pass
                     except Exception:
-                        shortest = None
+                        pass
 
                     paths_meta.append({
                         'path': path,
                         'path_length_nodes': path_len,
                         'avg_edge_weight': avg_edge_weight,
-                       'sum_edge_weight': sum_edge_weight,
-                       'avg_adjacent_node_sim': avg_pair_sim,   # None if embeddings missing
+                        'sum_edge_weight': sum_edge_weight,
+                        'avg_adjacent_node_sim': avg_pair_sim, 
                         'kg_shortest_between_ends': shortest
                     })
 
@@ -208,42 +248,101 @@ class CrystalCluster:
 
     def commit_to_graph(self, documents: List[Document], graph_store: Neo4jGraphStore):
         """Neo4jにグラフを投入"""
-        with self.hlogger.section("Graph Generation"):
-            llm = OpenAI(model="gpt-4o-mini", timeout=120.0, output_version="v0")
-            storage_context = StorageContext.from_defaults(graph_store=graph_store)
-            
-            index = KnowledgeGraphIndex.from_documents(
-                documents,
-                storage_context=storage_context,
-                llm=llm,
-                transformations=[SimpleNodeParser.from_defaults(chunk_size=512)],
-                embed_model=HuggingFaceEmbedding(model_name="BAAI/bge-m3"),
-                show_progress=True,
-                max_triplets_per_chunk=10
+        #　接続確認　===========================================
+        try:
+            graph_store.query("RETURN 1")
+            self.logger.info("✅ Neo4j connection verified")
+        except Exception as e:
+            self.logger.error(
+                f"🚨 Neo4j connection failed: {type(e).__name__}\n"
+                f"   Message: {str(e)[:200]}\n"
+                f"   Check: URI, username, password, and service status"
             )
+            raise  # 接続できないなら処理を中断
+        # 2. グラフ生成 ===========================================
+        try:
+            with self.hlogger.section("Graph Generation"):
+                llm = OpenAI(model="gpt-4o-mini", timeout=120.0, output_version="v0")
+                storage_context = StorageContext.from_defaults(graph_store=graph_store)
             
-            kg = index.get_networkx_graph()
-            self.logger.info(f"✅ Initial graph: {len(kg.nodes)} nodes, {len(kg.edges)} edges")
-            optimized_kg = self._optimize_graph_rapl(kg, index)  # index 渡す！
-            self._update_neo4j_structure(optimized_kg, graph_store)
+                index = KnowledgeGraphIndex.from_documents(
+                    documents,
+                    storage_context=storage_context,
+                    llm=llm,
+                    transformations=[SimpleNodeParser.from_defaults(chunk_size=512)],
+                    embed_model=HuggingFaceEmbedding(model_name="BAAI/bge-m3"),
+                    show_progress=True,
+                    max_triplets_per_chunk=10
+                )
+            
+                kg = index.get_networkx_graph()
+                self.logger.info(f"✅ Initial graph: {len(kg.nodes)} nodes, {len(kg.edges)} edges")
+        except Exception as e:
+            self.logger.error(
+                f"🚨 Graph generation failed: {type(e).__name__}\n"
+                f"   Message: {str(e)[:200]}\n"
+                f"   This might be due to: LLM API issues, invalid documents, or embedding model errors"
+            )
+            raise
+        # 3. パス情報をグラフに統合　================================
 
-        with self.hlogger.section("Merging Path Information"):
-            self.merge_paths_into_kg(kg, documents)
-            self.logger.info(f"✅ Path info merged: {len(kg.nodes)} nodes, {len(kg.edges)} edges")
+        try:
+            with self.hlogger.section("Merging Path Information"):
+                self.merge_paths_into_kg(kg, documents)
+                self.logger.info(f"✅ Path info merged: {len(kg.nodes)} nodes, {len(kg.edges)} edges")
+
+        except Exception as e:
+            self.logger.warning(
+                f"⚠️  Path merging failed: {type(e).__name__} - {str(e)[:100]}\n"
+                f"   Continuing without path information..."
+            )
 
         # ============================================================
         # RAPL風最適化: トリプレット間の相互作用を計算
         # ============================================================
-        with self.hlogger.section("Graph Optimization (RAPL)"):
-            optimized_kg = self._optimize_graph_rapl(kg, documents)
-            self.logger.info(
-                f"✅ Optimized graph: {len(optimized_kg.nodes)} nodes, "
-                f"{len(optimized_kg.edges)} edges"
+        try:
+            with self.hlogger.section("Graph Optimization (RAPL)"):
+                optimized_kg = self._optimize_graph_rapl(kg, documents)
+                self.logger.info(
+                    f"✅ Optimized graph: {len(optimized_kg.nodes)} nodes, "
+                    f"{len(optimized_kg.edges)} edges"
+                )
+        except Exception as e:
+            self.logger.error(
+                        f"🚨 Graph optimization failed: {type(e).__name__}\n"
+                        f"   Message: {str(e)[:200]}\n"
+                        f"   Using unoptimized graph instead..."
             )
-            
+     
             # 最適化されたグラフをNeo4jに反映
-            self._update_neo4j_structure(optimized_kg, graph_store)
+        try:
+            with self.hlogger.section("Updating Neo4j"):
+                result = self._update_neo4j_structure(optimized_kg, graph_store)
+            
+            # 結果サマリー
+                self.logger.info(
+                    f"✅ Neo4j update complete:\n"
+                    f"   - Updated: {result['updated']} edges\n"
+                    f"   - Skipped: {result['skipped']} edges\n"
+                    f"   - Failed: {result['failed']} edges"
+                )
+            
+            # 失敗率が高い場合は警告
+                total = result['updated'] + result['failed']
+                if total > 0 and result['failed'] / total > 0.3:
+                    self.logger.warning(
+                        f"⚠️  High failure rate ({result['failed']/total:.1%}). "
+                        f"Check Neo4j constraints and data format."
+                    )
     
+        except Exception as e:
+            self.logger.error(
+                f"🚨 Neo4j update failed: {type(e).__name__}\n"
+                f"   Message: {str(e)[:200]}\n"
+                f"   Graph was optimized but not persisted to database!"
+            )
+            raise
+
     def merge_paths_into_kg(self, kg, documents: List[Document]):
         """
         kg: networkx.Graph (triples turned into nodes/edges)
@@ -447,54 +546,56 @@ class CrystalCluster:
         self.logger.info(f"Added {inter_count} meaningful inter-interactions")
     
     # ============================================================
-    # 4. Document-level linking（元のコードの良い部分）
+    # 4. Document-level linking
     # ============================================================
         self.logger.info("Computing document-level connections...")
     
-        entity_docs = {}
-        for doc_id, triples in doc_triples.items():
-            for s, _, o in triples:
-                entity_docs.setdefault(s, set()).add(doc_id)
-                entity_docs.setdefault(o, set()).add(doc_id)
+        try:
+            entity_docs = {}
+            for doc_id, triples in doc_triples.items():
+                for s, _, o in triples:
+                    entity_docs.setdefault(s, set()).add(doc_id)
+                    entity_docs.setdefault(o, set()).add(doc_id)
     
-        doc_pairs = {}
-        bridge_entities = []
+            doc_pairs = {}
+            bridge_entities = []
     
-        for entity_name, doc_set in entity_docs.items():
-            if len(doc_set) > 1:
-                docs = list(doc_set)
-                for i, d1 in enumerate(docs):
-                    for d2 in docs[i+1:]:
-                        pair = (d1, d2)
-                        doc_pairs[pair] = doc_pairs.get(pair, 0) + 1
+            for entity_name, doc_set in entity_docs.items():
+                if len(doc_set) > 1:
+                    docs = list(doc_set)
+                    for i, d1 in enumerate(docs):
+                        for d2 in docs[i+1:]:
+                            pair = (d1, d2)
+                            doc_pairs[pair] = doc_pairs.get(pair, 0) + 1
             
-                if len(doc_set) > 2:
-                    bridge_entities.append((entity_name, len(doc_set)))
-    
-    # ブリッジエンティティのログ
-        if bridge_entities:
-            bridge_entities.sort(key=lambda x: x[1], reverse=True)
-            self.logger.info("Top bridge entities:")
-            for entity_name, count in bridge_entities[:5]:
-                self.logger.info(f"  '{entity_name}': {count} documents")
-    
-    # Document間エッジ追加
-        inter_doc_count = 0
-        for (d1, d2), ct in doc_pairs.items():
-            if ct > 2:
-                n1 = f"doc_{d1}"
-                n2 = f"doc_{d2}"
-            
-                if not kg.has_node(n1):
-                    kg.add_node(n1, type="document")
-                if not kg.has_node(n2):
-                    kg.add_node(n2, type="document")
-            
-                kg.add_edge(n1, n2, relation="inter_doc", weight=ct)
-                inter_doc_count += 1
-    
-        self.logger.info(f"Added {inter_doc_count} inter-document links")
-    
+                    if len(doc_set) > 2:
+                        bridge_entities.append((entity_name, len(doc_set)))
+
+                # ブリッジエンティティのログ
+            if bridge_entities:
+                bridge_entities.sort(key=lambda x: x[1], reverse=True)
+                self.logger.info("Top bridge entities:")
+                for entity_name, count in bridge_entities[:5]:
+                    self.logger.info(f"  '{entity_name}': {count} documents")
+
+            inter_doc_count = 0
+            for (d1, d2), ct in doc_pairs.items():
+                if ct > 2:
+                    n1 = f"doc_{d1}"
+                    n2 = f"doc_{d2}"
+                
+                    if not kg.has_node(n1):
+                        kg.add_node(n1, type="document")
+                    if not kg.has_node(n2):
+                        kg.add_node(n2, type="document")
+                
+                    kg.add_edge(n1, n2, relation="inter_doc", weight=ct)
+                    inter_doc_count += 1
+            self.logger.info(f"Added {inter_doc_count} inter-document links")
+
+        except Exception as e:
+            self.logger.error(f"Document linking failed: {type(e).__name__} - {str(e)[:100]}")
+ 
     # ============================================================
     # 5. 統合重み（RAPL式）
     # ============================================================
@@ -505,10 +606,8 @@ class CrystalCluster:
             inter = d.get("inter_raw", 0.0)
         
         # RAPL論文: intra重視 + inter補完
-            d["weight"] = min(0.7 * intra + 0.3 * inter, 1.0)
-    
+            d["weight"] = min(0.7 * intra + 0.3 * inter, 1.0)    
         return kg
-
     
     def _group_triples_by_document(self, kg, documents):
         """トリプレットをDocument別にグループ化"""
