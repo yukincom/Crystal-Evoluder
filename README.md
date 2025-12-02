@@ -1,10 +1,10 @@
 # Crystal-Evoluder　Alpha
 
-**TEI.xml → Markdown → Neo4j Graph DB Pipeline (LLM-powered)**
+**PDF → Grobid → TEI.xml → Neo4j Graph DB Pipeline (LLM-powered)**
 Transform structured PDFs into machine-readable knowledge graphs.
 
 Crystal-Evoluder is a two-stage pipeline for converting academic papers into a semantic knowledge graph.
-The system uses **GROBID → TEI.xml → Markdown → LLM-driven triplet extraction → Neo4j**.
+The system uses **GROBID → TEI.xml → LLM-driven triplet extraction → Neo4j**.
 
 This repository contains two main scripts:
 
@@ -12,7 +12,7 @@ This repository contains two main scripts:
 
 ## ✨ Features
 
-* Convert **GROBID TEI.xml** into clean, RAG-ready **Markdown**
+* Convert **GROBID TEI.xml** into clean, RAG-ready **JSON**
 * Generate high-quality embeddings using **text-embedding-3-large**
 * Extract conceptual relationships (triplets) using **GPT-4o-mini**
 * Store nodes/edges inside a **Neo4j** graph database
