@@ -16,11 +16,11 @@ import networkx as nx
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
-from llama_index.core import Document, KnowledgeGraphIndex, StorageContext
-from llama_index.graph_stores.neo4j import Neo4jGraphStore
-from llama_index.llms.openai import OpenAI
+from llama_index.llms.openai import OpenAI  
 from llama_index.core.node_parser import SimpleNodeParser
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+from llama_index.graph_stores.neo4j import Neo4jGraphStore
+from llama_index.core import Document, KnowledgeGraphIndex, StorageContext
 
 # 共通モジュール
 from shared.logger import setup_logger, HierarchicalLogger
@@ -33,13 +33,17 @@ class CrystalCluster:
     def __init__(self, log_level: int = logging.INFO):
         self.logger = setup_logger('CrystalCluster', log_level)
         self.hlogger = HierarchicalLogger(self.logger)
-        self.logger.info("Crystal Cluster v1.1 initialized")
-    
 
-        self.relation_embedder = HuggingFaceEmbedding(model_name="BAAI/bge-small-en-v1.5:q4_k_m")
-        
-        self.logger.info("Crystal Cluster v1.1 initialized")
+        self.embed_model = HuggingFaceEmbedding(
+            model_name="BAAI/bge-m3",
+            device="mps",
+            embed_batch_size=16,
+        )
 
+        from llama_index.core import Settings
+        Settings.embed_model = self.embed_model
+
+        self.logger.info("Crystal Cluster v1.1 initialized")
 
     def load_documents(
         self,
@@ -308,30 +312,35 @@ class CrystalCluster:
                     f"{len(optimized_kg.edges)} edges"
                 )
         except Exception as e:
-            self.logger.error(
+            self.logger.error(  
                         f"🚨 Graph optimization failed: {type(e).__name__}\n"
                         f"   Message: {str(e)[:200]}\n"
                         f"   Using unoptimized graph instead..."
             )
-     
+            optimized_kg = kg 
             # 最適化されたグラフをNeo4jに反映
         try:
             with self.hlogger.section("Updating Neo4j"):
                 result = self._update_neo4j_structure(optimized_kg, graph_store)
             
+            # result が None の場合のフォールバック
+                if result is None:
+                    result = {'updated': 0, 'skipped': 0, 'failed': 0, 'error_details': []}
+                    self.logger.warning("⚠️  _update_neo4j_structure returned None")
+
             # 結果サマリー
                 self.logger.info(
                     f"✅ Neo4j update complete:\n"
-                    f"   - Updated: {result['updated']} edges\n"
-                    f"   - Skipped: {result['skipped']} edges\n"
-                    f"   - Failed: {result['failed']} edges"
+                    f"   - Updated: {result.get('updated', 0)} edges\n"
+                    f"   - Skipped: {result.get('skipped', 0)} edges\n"
+                    f"   - Failed: {result.get('failed', 0)} edges"
                 )
             
             # 失敗率が高い場合は警告
-                total = result['updated'] + result['failed']
-                if total > 0 and result['failed'] / total > 0.3:
+                total = result.get('updated', 0) + result.get('failed', 0)
+                if total > 0 and result.get('failed', 0) / total > 0.3:
                     self.logger.warning(
-                        f"⚠️  High failure rate ({result['failed']/total:.1%}). "
+                        f"⚠️  High failure rate ({result.get('failed', 0)/total:.1%}). "
                         f"Check Neo4j constraints and data format."
                     )
     
