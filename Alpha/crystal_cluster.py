@@ -21,6 +21,8 @@ from llama_index.core.node_parser import SimpleNodeParser
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.graph_stores.neo4j import Neo4jGraphStore
 from llama_index.core import Document, KnowledgeGraphIndex, StorageContext
+from llama_index.core.graph_stores import SimpleGraphStore
+
 
 # 共通モジュール
 from shared.logger import setup_logger, HierarchicalLogger
@@ -267,11 +269,15 @@ class CrystalCluster:
         try:
             with self.hlogger.section("Graph Generation"):
                 llm = OpenAI(model="gpt-4o-mini", timeout=120.0, output_version="v0")
-                storage_context = StorageContext.from_defaults(graph_store=graph_store)
+            #    storage_context = StorageContext.from_defaults(graph_store=graph_store)
             
+                local_graph_store = SimpleGraphStore()
+                local_storage = StorageContext.from_defaults(graph_store=local_graph_store)
+
+                self.logger.info("Building local knowledge graph...")
                 index = KnowledgeGraphIndex.from_documents(
                     documents,
-                    storage_context=storage_context,
+                    storage_context=local_storage, 
                     llm=llm,
                     transformations=[SimpleNodeParser.from_defaults(chunk_size=512)],
                     embed_model=HuggingFaceEmbedding(model_name="BAAI/bge-m3"),
@@ -281,6 +287,49 @@ class CrystalCluster:
             
                 kg = index.get_networkx_graph()
                 self.logger.info(f"✅ Initial graph: {len(kg.nodes)} nodes, {len(kg.edges)} edges")
+
+                # トリプレットをメタデータに保存
+                all_triples = []
+
+                for subj, obj, data in kg.edges(data=True):
+                    rel = data.get('relation', 'RELATED')
+                    all_triples.append((subj, rel, obj))
+
+                if hasattr(local_graph_store, 'get_rel_map'):
+                    try:
+                        rel_map = local_graph_store.get_rel_map()
+                        self.logger.debug(f"rel_map structure: {type(rel_map)}")
+        
+                        for subj, relations in rel_map.items():
+                        # relations が辞書か、リストか確認
+                            if isinstance(relations, dict):
+                                # 辞書の場合
+                                for rel, objs in relations.items():
+                                    if isinstance(objs, list):
+                                        for obj in objs:
+                                            if (subj, rel, obj) not in all_triples:
+                                                all_triples.append((subj, rel, obj))
+                                    else:
+                                        if (subj, rel, objs) not in all_triples:
+                                            all_triples.append((subj, rel, objs))
+            
+                            elif isinstance(relations, list):
+                                # リストの場合
+                                for item in relations:
+                                    if isinstance(item, tuple) and len(item) == 2:
+                                        rel, obj = item
+                                        if (subj, rel, obj) not in all_triples:
+                                            all_triples.append((subj, rel, obj))
+    
+                    except Exception as e:
+                        self.logger.warning(f"Could not parse rel_map: {e}")
+
+                self.logger.info(f"Extracted {len(all_triples)} triples total")
+                # すべてのドキュメントに全トリプルを共有
+                # （ドキュメント別に分けるのは難しいので、全体として扱う）
+                for doc in documents:
+                    doc.metadata['triples'] = all_triples
+
         except Exception as e:
             self.logger.error(
                 f"🚨 Graph generation failed: {type(e).__name__}\n"
