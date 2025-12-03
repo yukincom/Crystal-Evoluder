@@ -89,7 +89,7 @@ class ErrorCollector:
     def get_summary(self) -> Dict[str, Any]:
         """集計結果を辞書で返す"""
         return {
-            'success': self.success_count,
+            'updated': self.success_count, 
             'skipped': self.skip_count,
             'failed': len(self.errors),
             'error_types': dict(Counter(e['error_type'] for e in self.errors)),
