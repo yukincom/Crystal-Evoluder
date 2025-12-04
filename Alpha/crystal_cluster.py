@@ -1,5 +1,5 @@
 """
-Crystal Cluster 
+Crystal Cluster beta
 Knowledge Graph committer for Neo4j
 
 """
@@ -12,9 +12,11 @@ import logging
 import pickle
 import numpy as np
 import networkx as nx
+import hashlib
 
+from collections import defaultdict
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple, Set
 
 from llama_index.llms.openai import OpenAI  
 from llama_index.core.node_parser import SimpleNodeParser
@@ -22,7 +24,7 @@ from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.graph_stores.neo4j import Neo4jGraphStore
 from llama_index.core import Document, KnowledgeGraphIndex, StorageContext
 from llama_index.core.graph_stores import SimpleGraphStore
-
+from llama_index.core.node_parser import SentenceSplitter
 
 # 共通モジュール
 from shared.logger import setup_logger, HierarchicalLogger
@@ -32,9 +34,38 @@ from shared.error_handler import ErrorCollector, safe_execute
 class CrystalCluster:
     """Crystal Cluster - Neo4j投入専用"""
     
-    def __init__(self, log_level: int = logging.INFO):
+    def __init__(self, log_level: int = logging.INFO, use_dual_chunk: bool = False):
+        """
+        Args:
+            use_dual_chunk: Trueならデュアルチャンク機能を有効化
+        """
         self.logger = setup_logger('CrystalCluster', log_level)
         self.hlogger = HierarchicalLogger(self.logger)
+        self.use_dual_chunk = use_dual_chunk    
+
+        self.config = {
+            # Entity Linking
+            'entity_linking_threshold': 0.88,  # 0.95 → 0.88
+            
+            # Retrieval chunk
+            'retrieval_chunk_size': 512,  # 1024 → 512
+            'retrieval_chunk_overlap': 100,  # 200 → 100
+            
+            # Graph chunk
+            'graph_chunk_size': 512,
+            'graph_chunk_overlap': 50,
+            
+            # RAPL最適化
+            'relation_compat_threshold': 0.08,  # 0.2 → 0.08
+            'final_weight_cutoff': 0.02,  # 0.05 → 0.02
+            
+            # トリプレット抽出
+            'max_triplets_per_chunk': 15,  # 10 → 15
+            
+            # LLM選択
+            'llm_model': 'gpt-4o-mini',  # 後でUI選択可能に
+            'llm_timeout': 120.0
+        }
 
         self.embed_model = HuggingFaceEmbedding(
             model_name="BAAI/bge-m3",
@@ -45,7 +76,8 @@ class CrystalCluster:
         from llama_index.core import Settings
         Settings.embed_model = self.embed_model
 
-        self.logger.info("Crystal Cluster v1.1 initialized")
+        self.logger.info(f"Crystal Cluster beta initialized")
+        self.logger.info(f"Config: {self.config}")
 
     def load_documents(
         self,
@@ -251,6 +283,673 @@ class CrystalCluster:
                 doc.metadata.setdefault('path_distances', path_dicts[0].get('path_distances', []))
         return documents
     
+    def _generate_chunk_id(self, text: str, source_id: str, index: int) -> str:
+        """
+        チャンクの一意なIDを生成
+        
+        Args:
+            text: チャンクのテキスト
+            source_id: 元ドキュメントのID
+            index: チャンク番号
+        
+        Returns:
+            'doc123_chunk5_a7f3e9b2' のような一意ID
+        """
+        # テキストのハッシュ（最初の100文字から）
+        text_hash = hashlib.md5(text[:100].encode()).hexdigest()[:8]
+        return f"{source_id}_chunk{index}_{text_hash}"
+    
+    # ============================================================
+    # Dual-documents 生成
+    # ============================================================
+    def create_dual_documents(
+        self,
+        documents: List[Document]) -> Tuple[List[Document], List[Document]]:
+        """
+        既存のDocumentから Graph用 と Retrieval用 の2種類を作る
+        
+        Args:
+            documents: load_documents() で作成したDocumentリスト
+        
+        Returns:
+            (graph_docs, retrieval_docs)
+        """
+        if not self.use_dual_chunk:
+            # デュアルチャンク無効時は元のドキュメントをそのまま返す
+            return documents, documents
+        
+        graph_splitter, retrieval_splitter = self.get_dual_splitters()
+        graph_docs = []
+        retrieval_docs = []
+        
+        for doc in documents:
+            base_meta = dict(doc.metadata)
+            
+            # ------------------------------------------------------------
+            # Graph用チャンク（小さめ）
+            # ------------------------------------------------------------
+            try:
+                graph_nodes = graph_splitter.get_nodes_from_documents([doc])
+                for j, node in enumerate(graph_nodes):
+                    md = dict(base_meta)
+                    md.update({
+                        'chunk_type': 'structural',
+                        'chunk_index': j,
+                        'chunk_size': len(node.text)
+                    })
+                    graph_docs.append(Document(
+                        text=node.text,
+                        metadata=md
+                    ))
+            except Exception as e:
+                self.logger.warning(f"Graph splitting failed: {e}")
+                # フォールバック：元のドキュメントを使う
+                md = dict(base_meta)
+                md['chunk_type'] = 'structural'
+                graph_docs.append(Document(text=doc.text, metadata=md))
+            
+            # ------------------------------------------------------------
+            # Retrieval用チャンク（大きめ）
+            # ------------------------------------------------------------
+            try:
+                retrieval_nodes = retrieval_splitter.get_nodes_from_documents([doc])
+                for j, node in enumerate(retrieval_nodes):
+                    md = dict(base_meta)
+                    md.update({
+                        'chunk_type': 'semantic',
+                        'chunk_index': j,
+                        'chunk_size': len(node.text)
+                    })
+                    retrieval_docs.append(Document(
+                        text=node.text,
+                        metadata=md
+                    ))
+            except Exception as e:
+                self.logger.warning(f"Retrieval splitting failed: {e}")
+                md = dict(base_meta)
+                md['chunk_type'] = 'semantic'
+                retrieval_docs.append(Document(text=doc.text, metadata=md))
+        
+        self.logger.info(
+            f"📄 Created {len(graph_docs)} graph chunks, "
+            f"{len(retrieval_docs)} retrieval chunks"
+        )
+        
+        return graph_docs, retrieval_docs
+
+    def _find_overlapping_chunks(
+        self,
+        start: int,
+        end: int,
+        graph_docs: List[Document]
+    ) -> List[str]:
+        """
+        指定範囲と重なるGraphチャンクのIDを返す
+        
+        Args:
+            start, end: 文字位置
+            graph_docs: 同一ドキュメントのGraphチャンクリスト
+        
+        Returns:
+            重なるチャンクのIDリスト
+        """
+        overlapping = []
+        
+        for doc in graph_docs:
+            g_start = doc.metadata.get('start_char', 0)
+            g_end = doc.metadata.get('end_char', 0)
+            
+            # 範囲の重なりチェック
+            if not (end <= g_start or start >= g_end):
+                overlapping.append(doc.metadata['chunk_id'])
+        
+        return overlapping
+    
+
+    # ============================================================
+    # 修正1: get_dual_splitters（チャンクサイズ調整）
+    # ============================================================
+    
+    def get_dual_splitters(self) -> Tuple[SentenceSplitter, SentenceSplitter]:
+        """
+        Graph用とRetrieval用の2系統を返す（チューニング版）
+        """
+        # Graph用：小さめチャンク
+        graph_splitter = SentenceSplitter(
+            chunk_size=self.config['graph_chunk_size'],
+            chunk_overlap=self.config['graph_chunk_overlap'],
+            paragraph_separator="\n\n",
+            secondary_chunking_regex=r"[.!?。！?]\s+"
+        )
+        
+        # Retrieval用：中サイズチャンク（512に変更）
+        retrieval_splitter = SentenceSplitter(
+            chunk_size=self.config['retrieval_chunk_size'],  # 512
+            chunk_overlap=self.config['retrieval_chunk_overlap'],  # 100
+            paragraph_separator="\n\n",
+            secondary_chunking_regex=r"[.!?。！?]\s+"
+        )
+        
+        self.logger.info(
+            f"Splitters: graph={self.config['graph_chunk_size']}, "
+            f"retrieval={self.config['retrieval_chunk_size']}"
+        )
+        
+        return graph_splitter, retrieval_splitter
+
+
+    # ============================================================
+    # Retrieve関数を拡張（Graph node情報を付与）
+    # ============================================================
+    
+    def retrieve(
+        self,
+        store: Dict,
+        query: str,
+        top_k: int = 5,
+        chunk_mapping: Dict = None
+    ) -> List[Tuple[float, Document, List[str]]]:
+        """
+        クエリに対してコサイン類似度で検索
+        
+        **拡張点:**
+        - 各結果に対応するgraph_chunk_idsを付与
+        
+        Returns:
+            [(score, Document, graph_chunk_ids), ...] のリスト
+        """
+        if len(store['docs']) == 0:
+            self.logger.warning("⚠️  Retrieval store is empty")
+            return []
+        
+        # クエリの埋め込み
+        qemb = np.array(self.embed_model.get_text_embedding(query))
+        qnorm = np.linalg.norm(qemb)
+        if qnorm > 1e-9:
+            qemb = qemb / qnorm
+        
+        # コサイン類似度計算
+        sims = store['embeddings'] @ qemb
+        top_indices = np.argsort(-sims)[:top_k]
+        
+        results = []
+        for i in top_indices:
+            if i >= len(store['docs']):
+                continue
+            
+            doc = store['docs'][i]
+            score = float(sims[i])
+            
+            # Graph chunk IDsを取得
+            graph_chunk_ids = doc.metadata.get('graph_chunk_ids', [])
+            
+            # または、chunk_mappingから逆引き
+            if not graph_chunk_ids and chunk_mapping:
+                chunk_id = doc.metadata.get('chunk_id')
+                graph_chunk_ids = chunk_mapping.get('retrieval_to_graph', {}).get(chunk_id, [])
+            
+            results.append((score, doc, graph_chunk_ids))
+        
+        return results
+    
+    # ============================================================
+    # 統合ビルド関数を修正
+    # ============================================================
+    
+    def commit_to_graph_with_retrieval(
+        self,
+        documents: List[Document],
+        graph_store: Neo4jGraphStore
+    ) -> Dict[str, Any]:
+        """
+        Graph index と Retrieval store を同時に構築（同期版）
+        """
+        with self.hlogger.section("Dual-Index Building (Synced)"):
+            # 1. Dual-documents生成（同期マッピング付き）
+            graph_docs, retrieval_docs, chunk_mapping = self.create_dual_documents(documents)
+            
+            self.logger.info(
+                f"🔗 Chunk mapping: "
+                f"{len(chunk_mapping['graph_to_retrieval'])} graph -> retrieval links"
+            )
+            
+            # 2. Graph構築
+            self.logger.info("📊 Building knowledge graph...")
+            self.commit_to_graph(graph_docs, graph_store)
+            
+            # 3. Retrieval store構築
+            self.logger.info("🔍 Building retrieval store...")
+            retrieval_store = self.build_retrieval_store(retrieval_docs)
+            
+            # chunk_mappingをstoreに追加
+            retrieval_store['chunk_mapping'] = chunk_mapping
+        
+        return {
+            'retrieval_store': retrieval_store,
+            'chunk_mapping': chunk_mapping,
+            'stats': {
+                'graph_docs': len(graph_docs),
+                'retrieval_docs': len(retrieval_docs),
+                'sync_links': len(chunk_mapping['retrieval_to_graph'])
+            }
+        }
+
+  
+    def link_entities(
+        self,
+        kg: nx.Graph,
+        similarity_threshold: float = 0.88,
+        use_embedding: bool = True
+    ) -> Tuple[nx.Graph, Dict[str, str]]:
+        """
+        同一実体を統合してグラフをクリーンアップ
+        
+        Args:
+            kg: NetworkXグラフ
+            similarity_threshold: 統合する類似度の閾値（0.95推奨）
+            use_embedding: True=埋め込み類似度、False=文字列類似度
+        
+        Returns:
+            (統合後のグラフ, エンティティマッピング)
+            
+        例:
+            mapping = {
+                'Self-Attention': 'self_attention',
+                'the attention mechanism': 'self_attention',
+                'it': 'self_attention'  # coref解決が必要
+            }
+        """
+        self.logger.info(f"🔗 Starting entity linking (threshold={similarity_threshold})")
+        
+        nodes = list(kg.nodes())
+        entity_mapping = {}  # old_name -> canonical_name
+        clusters = []  # [[類似エンティティのリスト], ...]
+        
+        # ============================================================
+        # 1. エンティティのクラスタリング
+        # ============================================================
+        if use_embedding:
+            clusters = self._cluster_entities_by_embedding(
+                nodes, similarity_threshold
+            )
+        else:
+            clusters = self._cluster_entities_by_string(nodes)
+        
+        # ============================================================
+        # 2. 各クラスタの代表名を決定
+        # ============================================================
+        for cluster in clusters:
+            if len(cluster) <= 1:
+                continue
+            
+            # 代表名の選択戦略
+            canonical = self._select_canonical_name(cluster, kg)
+            
+            for entity in cluster:
+                if entity != canonical:
+                    entity_mapping[entity] = canonical
+        
+        self.logger.info(f"  → {len(entity_mapping)} entities will be merged")
+        
+        # ============================================================
+        # 3. グラフの統合
+        # ============================================================
+        merged_kg = self._merge_graph_entities(kg, entity_mapping)
+        
+        self.logger.info(
+            f"✅ Entity linking complete: "
+            f"{len(kg.nodes)} → {len(merged_kg.nodes)} nodes"
+        )
+        
+        return merged_kg, entity_mapping
+    
+    def _cluster_entities_by_embedding(
+        self,
+        entities: List[str],
+        threshold: float
+    ) -> List[List[str]]:
+        """
+        埋め込みベースのクラスタリング
+        
+        Returns:
+            [[類似エンティティ], [類似エンティティ], ...]
+        """
+        # エンティティの埋め込み計算
+        embeddings = []
+        valid_entities = []
+        
+        for entity in entities:
+            try:
+                emb = self.embed_model.get_text_embedding(entity)
+                emb = np.array(emb, dtype=np.float32)
+                norm = np.linalg.norm(emb)
+                
+                if norm > 1e-9:
+                    emb = emb / norm
+                    embeddings.append(emb)
+                    valid_entities.append(entity)
+            except Exception as e:
+                self.logger.debug(f"Embedding failed for '{entity}': {e}")
+        
+        if len(embeddings) == 0:
+            return []
+        
+        embeddings = np.vstack(embeddings)
+        
+        # 類似度マトリクス計算
+        sim_matrix = embeddings @ embeddings.T
+        
+        # Union-Find でクラスタリング
+        parent = {i: i for i in range(len(valid_entities))}
+        
+        def find(x):
+            if parent[x] != x:
+                parent[x] = find(parent[x])
+            return parent[x]
+        
+        def union(x, y):
+            px, py = find(x), find(y)
+            if px != py:
+                parent[px] = py
+        
+        # 類似度が閾値以上のペアを統合
+        for i in range(len(valid_entities)):
+            for j in range(i + 1, len(valid_entities)):
+                if sim_matrix[i, j] >= threshold:
+                    union(i, j)
+        
+        # クラスタを構築
+        clusters_dict = defaultdict(list)
+        for i, entity in enumerate(valid_entities):
+            root = find(i)
+            clusters_dict[root].append(entity)
+        
+        clusters = list(clusters_dict.values())
+        
+        self.logger.info(
+            f"  → Found {len(clusters)} clusters from {len(valid_entities)} entities"
+        )
+        
+        return clusters
+    
+    def _cluster_entities_by_string(
+        self,
+        entities: List[str]
+    ) -> List[List[str]]:
+        """
+        文字列類似度ベースのクラスタリング（高速だが精度低い）
+        
+        使用ケース：
+        - "Self-Attention" と "self-attention" を統合
+        - "GPT-3" と "GPT3" を統合
+        """
+        from difflib import SequenceMatcher
+        
+        clusters_dict = defaultdict(list)
+        normalized = {}
+        
+        for entity in entities:
+            # 正規化（小文字化、記号除去）
+            norm = entity.lower().replace('-', '').replace('_', '').replace(' ', '')
+            normalized[entity] = norm
+            clusters_dict[norm].append(entity)
+        
+        # 2つ以上のエンティティがある正規化形のみ返す
+        clusters = [v for v in clusters_dict.values() if len(v) > 1]
+        
+        return clusters
+    
+    def _select_canonical_name(
+        self,
+        cluster: List[str],
+        kg: nx.Graph
+    ) -> str:
+        """
+        クラスタの代表名を選択
+        
+        戦略：
+        1. 最も次数が高い（多くの関係を持つ）
+        2. 最も長い名前（情報量が多い）
+        3. アルファベット順
+        """
+        # 次数でスコアリング
+        scores = {}
+        for entity in cluster:
+            degree = kg.degree(entity) if kg.has_node(entity) else 0
+            length = len(entity)
+            
+            # スコア = 次数 * 10 + 長さ
+            scores[entity] = degree * 10 + length
+        
+        # スコアが最大のものを選択
+        canonical = max(cluster, key=lambda e: scores[e])
+        
+        self.logger.debug(
+            f"  Cluster: {cluster} → Canonical: '{canonical}'"
+        )
+        
+        return canonical
+    
+    def _merge_graph_entities(
+        self,
+        kg: nx.Graph,
+        entity_mapping: Dict[str, str]
+    ) -> nx.Graph:
+        """
+        エンティティマッピングに従ってグラフを統合
+        
+        Args:
+            kg: 元のグラフ
+            entity_mapping: {old_name: canonical_name}
+        
+        Returns:
+            統合後のグラフ
+        """
+        merged_kg = nx.Graph()
+        
+        # ノードをコピー（マッピング適用）
+        for node, data in kg.nodes(data=True):
+            canonical = entity_mapping.get(node, node)
+            
+            if merged_kg.has_node(canonical):
+                # 既存ノードの属性をマージ
+                for key, value in data.items():
+                    if key not in merged_kg.nodes[canonical]:
+                        merged_kg.nodes[canonical][key] = value
+            else:
+                merged_kg.add_node(canonical, **data)
+        
+        # エッジをコピー（マッピング適用 + 重み統合）
+        edge_weights = defaultdict(lambda: {
+            'weight': 0.0,
+            'intra_raw': 0.0,
+            'inter_raw': 0.0,
+            'relations': []
+        })
+        
+        for u, v, data in kg.edges(data=True):
+            u_canonical = entity_mapping.get(u, u)
+            v_canonical = entity_mapping.get(v, v)
+            
+            # 自己ループは除外
+            if u_canonical == v_canonical:
+                continue
+            
+            # 正規化されたエッジキー（方向なし）
+            edge_key = tuple(sorted([u_canonical, v_canonical]))
+            
+            # 重みを累積
+            edge_weights[edge_key]['weight'] += data.get('weight', 0.0)
+            edge_weights[edge_key]['intra_raw'] += data.get('intra_raw', 0.0)
+            edge_weights[edge_key]['inter_raw'] += data.get('inter_raw', 0.0)
+            
+            # 関係タイプを記録
+            rel = data.get('relation', 'RELATED')
+            if rel not in edge_weights[edge_key]['relations']:
+                edge_weights[edge_key]['relations'].append(rel)
+        
+        # エッジを追加
+        for (u, v), weights in edge_weights.items():
+            merged_kg.add_edge(
+                u, v,
+                weight=weights['weight'],
+                intra_raw=weights['intra_raw'],
+                inter_raw=weights['inter_raw'],
+                relation=weights['relations'][0] if weights['relations'] else 'RELATED',
+                relation_types=weights['relations']
+            )
+        
+        return merged_kg
+    
+
+
+    # ============================================================
+    # Retrieval Store 構築
+    # ============================================================
+    def build_retrieval_store(
+        self,
+        retrieval_docs: List[Document]
+    ) -> Dict[str, Any]:
+        """
+        Retrieval用の埋め込みストアを構築
+        
+        Returns:
+            {
+                'docs': [Document, ...],
+                'embeddings': np.array,
+                'metadata': {...}
+            }
+        """
+        self.logger.info("🔍 Building retrieval embeddings...")
+        
+        docs = []
+        embeddings = []
+        
+        from shared.error_handler import ErrorCollector
+        collector = ErrorCollector(self.logger)
+        
+        for doc in retrieval_docs:
+            try:
+                emb = self.embed_model.get_text_embedding(doc.text)
+                emb = np.array(emb, dtype=np.float32)
+                
+                # 正規化
+                norm = np.linalg.norm(emb)
+                if norm > 1e-9:
+                    emb = emb / norm
+                else:
+                    self.logger.debug("Zero-norm embedding, skipping")
+                    continue
+                
+                docs.append(doc)
+                embeddings.append(emb)
+                collector.add_success()
+            
+            except Exception as e:
+                collector.add_error(
+                    context=f"doc_{doc.metadata.get('source_id', 'unknown')}",
+                    error=e
+                )
+        
+        collector.report("Retrieval embedding generation", threshold=0.3)
+        
+        embeddings = np.vstack(embeddings) if embeddings else np.zeros((0, 1024))
+        
+        self.logger.info(f"✅ Built retrieval store: {len(docs)} docs")
+        
+        return {
+            'docs': docs,
+            'embeddings': embeddings,
+            'metadata': {
+                'total_docs': len(docs),
+                'embedding_dim': embeddings.shape[1] if len(embeddings) > 0 else 0
+            }
+        }
+    
+    # ============================================================
+    # 検索関数
+    # ============================================================
+    def retrieve(
+        self,
+        store: Dict,
+        query: str,
+        top_k: int = 5
+    ) -> List[Tuple[float, Document]]:
+        """
+        クエリに対してコサイン類似度で検索
+        
+        Returns:
+            [(score, Document), ...] のリスト（降順）
+        """
+        if len(store['docs']) == 0:
+            self.logger.warning("⚠️  Retrieval store is empty")
+            return []
+        
+        # クエリの埋め込み
+        qemb = np.array(self.embed_model.get_text_embedding(query))
+        qnorm = np.linalg.norm(qemb)
+        if qnorm > 1e-9:
+            qemb = qemb / qnorm
+        
+        # コサイン類似度計算
+        sims = store['embeddings'] @ qemb
+        
+        # Top-k取得
+        top_indices = np.argsort(-sims)[:top_k]
+        
+        results = [
+            (float(sims[i]), store['docs'][i])
+            for i in top_indices
+            if i < len(store['docs'])
+        ]
+        
+        return results
+
+
+    # ============================================================
+    # 統合ビルド関数（既存のcommit_to_graphを拡張）
+    # ============================================================
+    def commit_to_graph_with_retrieval(
+        self,
+        documents: List[Document],
+        graph_store: Neo4jGraphStore
+    ) -> Dict[str, Any]:
+        """
+        Graph index と Retrieval store を同時に構築
+        
+        Returns:
+            {
+                'kg_networkx': networkx.Graph,
+                'retrieval_store': dict,
+                'stats': {...}
+            }
+        """
+        with self.hlogger.section("Dual-Index Building"):
+            # 1. Dual-documents生成
+            graph_docs, retrieval_docs = self.create_dual_documents(documents)
+            
+            # 2. Graph構築（既存のcommit_to_graphロジックを使う）
+            self.logger.info("📊 Building knowledge graph...")
+            self.commit_to_graph(graph_docs, graph_store)
+            
+            # グラフを取得（既に構築済み）
+            # ※ commit_to_graphの中でkgを返すように修正が必要
+            # 今は暫定的にNoneを返す
+            kg = None
+            
+            # 3. Retrieval store構築
+            self.logger.info("🔍 Building retrieval store...")
+            retrieval_store = self.build_retrieval_store(retrieval_docs)
+        
+        return {
+            'kg_networkx': kg,
+            'retrieval_store': retrieval_store,
+            'stats': {
+                'graph_docs': len(graph_docs),
+                'retrieval_docs': len(retrieval_docs),
+                'retrieval_embeddings': len(retrieval_store['docs'])
+            }
+        }
 
     def commit_to_graph(self, documents: List[Document], graph_store: Neo4jGraphStore):
         """Neo4jにグラフを投入"""
@@ -259,16 +958,15 @@ class CrystalCluster:
             graph_store.query("RETURN 1")
             self.logger.info("✅ Neo4j connection verified")
         except Exception as e:
-            self.logger.error(
-                f"🚨 Neo4j connection failed: {type(e).__name__}\n"
-                f"   Message: {str(e)[:200]}\n"
-                f"   Check: URI, username, password, and service status"
-            )
+            self.logger.error(f"🚨 Neo4j connection failed: {type(e).__name__}")
             raise  # 接続できないなら処理を中断
         # 2. グラフ生成 ===========================================
         try:
             with self.hlogger.section("Graph Generation"):
-                llm = OpenAI(model="gpt-4o-mini", timeout=120.0, output_version="v0")
+                llm = OpenAI(
+                    model=self.config['llm_model'],
+                    timeout=self.config['llm_timeout']
+                )
             #    storage_context = StorageContext.from_defaults(graph_store=graph_store)
             
                 local_graph_store = SimpleGraphStore()
@@ -280,9 +978,9 @@ class CrystalCluster:
                     storage_context=local_storage, 
                     llm=llm,
                     transformations=[SimpleNodeParser.from_defaults(chunk_size=512)],
-                    embed_model=HuggingFaceEmbedding(model_name="BAAI/bge-m3"),
+                    embed_model=self.embed_model,
                     show_progress=True,
-                    max_triplets_per_chunk=10
+                    max_triplets_per_chunk=self.config['max_triplets_per_chunk']    # 15
                 )
             
                 kg = index.get_networkx_graph()
@@ -294,7 +992,7 @@ class CrystalCluster:
                 for subj, obj, data in kg.edges(data=True):
                     rel = data.get('relation', 'RELATED')
                     all_triples.append((subj, rel, obj))
-
+                # rel_map処理
                 if hasattr(local_graph_store, 'get_rel_map'):
                     try:
                         rel_map = local_graph_store.get_rel_map()
@@ -332,27 +1030,47 @@ class CrystalCluster:
 
         except Exception as e:
             self.logger.error(
-                f"🚨 Graph generation failed: {type(e).__name__}\n"
-                f"   Message: {str(e)[:200]}\n"
-                f"   This might be due to: LLM API issues, invalid documents, or embedding model errors"
+                f"🚨 Graph generation failed: {type(e).__name__}"
             )
             raise
-        # 3. パス情報をグラフに統合　================================
 
+        # Entity Linking
+        try:
+            with self.hlogger.section("Entity Linking"):
+                kg, entity_mapping = self.link_entities(
+                    kg,
+                    similarity_threshold=self.config['entity_linking_threshold'],
+                    use_embedding=True
+                )
+                
+                # トリプレット更新
+                updated_triples = []
+                for s, r, o in all_triples:
+                    s_new = entity_mapping.get(s, s)
+                    o_new = entity_mapping.get(o, o)
+                    if s_new != o_new:  # 自己ループ除外
+                        updated_triples.append((s_new, r, o_new))
+                
+                # ドキュメントのメタデータを更新
+                for doc in documents:
+                    doc.metadata['triples'] = updated_triples
+                
+                self.logger.info(f"Updated triples: {len(all_triples)} → {len(updated_triples)}")
+        
+        except Exception as e:
+            self.logger.warning(f"⚠️  Entity linking failed: {e}")
+            # Entity Linking失敗でも処理は継続        
+
+        # パス情報をグラフに統合　================================
         try:
             with self.hlogger.section("Merging Path Information"):
                 self.merge_paths_into_kg(kg, documents)
                 self.logger.info(f"✅ Path info merged: {len(kg.nodes)} nodes, {len(kg.edges)} edges")
 
         except Exception as e:
-            self.logger.warning(
-                f"⚠️  Path merging failed: {type(e).__name__} - {str(e)[:100]}\n"
-                f"   Continuing without path information..."
-            )
+            self.logger.warning(f"⚠️  Path merging failed: {e}")
 
-        # ============================================================
-        # RAPL風最適化: トリプレット間の相互作用を計算
-        # ============================================================
+        # RAPL最適化
         try:
             with self.hlogger.section("Graph Optimization (RAPL)"):
                 optimized_kg = self._optimize_graph_rapl(kg, documents)
@@ -362,10 +1080,7 @@ class CrystalCluster:
                 )
         except Exception as e:
             self.logger.error(  
-                        f"🚨 Graph optimization failed: {type(e).__name__}\n"
-                        f"   Message: {str(e)[:200]}\n"
-                        f"   Using unoptimized graph instead..."
-            )
+                f"🚨 Graph optimization failed: {e}")
             optimized_kg = kg 
             # 最適化されたグラフをNeo4jに反映
         try:
@@ -375,6 +1090,7 @@ class CrystalCluster:
             # result が None の場合のフォールバック
                 if result is None:
                     result = {'updated': 0, 'skipped': 0, 'failed': 0, 'error_details': []}
+                    
                     self.logger.warning("⚠️  _update_neo4j_structure returned None")
 
             # 結果サマリー
@@ -394,11 +1110,7 @@ class CrystalCluster:
                     )
     
         except Exception as e:
-            self.logger.error(
-                f"🚨 Neo4j update failed: {type(e).__name__}\n"
-                f"   Message: {str(e)[:200]}\n"
-                f"   Graph was optimized but not persisted to database!"
-            )
+            self.logger.error(f"🚨 Neo4j update failed: {e}")
             raise
 
     def merge_paths_into_kg(self, kg, documents: List[Document]):
@@ -451,13 +1163,11 @@ class CrystalCluster:
     
     def _optimize_graph_rapl(self, kg, documents):
         """
-        完全統合版 RAPL 最適化
+        RAPL 最適化
         """
         from collections import defaultdict
     
-    # ============================================================
     # 1. Triples 抽出
-    # ============================================================
         doc_triples = {}
         for idx, doc in enumerate(documents):
             triples = doc.metadata.get("triples", [])
@@ -473,9 +1183,7 @@ class CrystalCluster:
             kg[u][v]["intra_raw"] = 0.0
             kg[u][v]["inter_raw"] = 0.0
     
-    # ============================================================
     # 2. Intra: 文書内 triple 間相互作用
-    # ============================================================
         self.logger.info("Computing intra-interactions...")
         intra_collector = ErrorCollector(self.logger)
         intra_edges = 0
@@ -542,9 +1250,7 @@ class CrystalCluster:
         intra_collector.report("Intra-document processing", threshold=0.3)
         self.logger.info(f"Added {intra_edges} intra-document edges")
     
-    # ============================================================
     # 3. Inter: 共有エンティティベースの高速化
-    # ============================================================
         self.logger.info("Computing inter-interactions (optimized)...")
         inter_collector = ErrorCollector(self.logger)
     
@@ -560,7 +1266,7 @@ class CrystalCluster:
         seen_pairs = set()
         inter_count = 0
     
-        for entity, triple_indices in entity_to_triples.items():
+        for _entity, triple_indices in entity_to_triples.items():
             if len(triple_indices) < 2:
                 continue  # 1つの Triple にしか出現しないエンティティはスキップ
         
@@ -568,8 +1274,6 @@ class CrystalCluster:
             for i in range(len(indices)):
                 for j in range(i + 1, len(indices)):
                     idx1, idx2 = indices[i], indices[j]
-                
-                # ペアの重複チェック（同じペアを複数回計算しない）
                     pair = (min(idx1, idx2), max(idx1, idx2))
                     if pair in seen_pairs:
                         continue
@@ -581,7 +1285,7 @@ class CrystalCluster:
                         t2 = all_triples[idx2]
                         w = self._compute_inter_weight(t1, t2, kg=kg)
                 
-                        if w > 0.2:
+                        if w > self.config['relation_compat_threshold']: 
                             s1, _, o1 = t1
                             s2, _, o2 = t2
                     
@@ -603,9 +1307,7 @@ class CrystalCluster:
         inter_collector.report("Inter-document processing", threshold=0.3)
         self.logger.info(f"Added {inter_count} meaningful inter-interactions")
     
-    # ============================================================
     # 4. Document-level linking
-    # ============================================================
         self.logger.info("Computing document-level connections...")
     
         try:
@@ -654,9 +1356,7 @@ class CrystalCluster:
         except Exception as e:
             self.logger.error(f"Document linking failed: {type(e).__name__} - {str(e)[:100]}")
  
-    # ============================================================
-    # 5. 統合重み（RAPL式）
-    # ============================================================
+    # 5. 統合重み
         self.logger.info("Finalizing edge weights...")
     
         for u, v, d in kg.edges(data=True):
@@ -832,7 +1532,7 @@ class CrystalCluster:
     
     def _compute_relation_compatibility(self, r1: str, r2: str) -> float:
         """
-        関係の相性スコア（手動ルール + embeddingフォールバック）
+        関係の相性スコア
         """
         # 正規化（小文字化、アンダースコア統一）
         r1 = r1.lower().replace('-', '_')
@@ -911,7 +1611,8 @@ class CrystalCluster:
     # 例: action 系、state 系など
         action_verbs = {
             "creates", "builds", "develops", "produces", "makes",
-            "constructs", "designs", "implements", "generates"
+            "constructs", "designs", "implements", "generates",
+            "enables", "powers", "leverages", "accelerates"
         }
     
         state_verbs = {
@@ -929,7 +1630,7 @@ class CrystalCluster:
            (r1 in relation_verbs and r2 in relation_verbs):
             return 0.5
     
-    # 5. それ以外（低スコア）
+    # 5. 埋め込みフォールバック（低スコア）
         try:
             emb1 = self.relation_embedder.get_text_embedding(r1)
             emb2 = self.relation_embedder.get_text_embedding(r2)
@@ -940,6 +1641,9 @@ class CrystalCluster:
 
 
     def _update_neo4j_structure(self, kg, graph_store):
+        """
+        Neo4j更新（カットオフ0.02版）
+        """        
         query_template = """
         MERGE (a:Concept {name: $source})
         MERGE (b:Concept {name: $target})
@@ -952,9 +1656,9 @@ class CrystalCluster:
         for s, o, data in kg.edges(data=True):
             weight = data.get('weight', 0.0)
 
-            if weight <= 0: 
+            if weight <= self.config['final_weight_cutoff']: 
                 collector.add_skip()
-                continue  # 重み0は無視
+                continue 
             
             try:
                 graph_store.query(query_template, {
@@ -978,19 +1682,26 @@ class CrystalCluster:
 if __name__ == "__main__":
     import argparse
     
-    parser = argparse.ArgumentParser(description='Crystal Cluster v1.1')
+    parser = argparse.ArgumentParser(description='Crystal Cluster beta')
     parser.add_argument('json_file', help='Clean documents JSON file')
     parser.add_argument('--neo4j-uri', default='bolt://localhost:7687')
     parser.add_argument('--neo4j-user', default='neo4j')
     parser.add_argument('--neo4j-pass', required=True)
+    parser.add_argument('--dual-chunk', action='store_true', help='Enable dual-chunk mode')
+    parser.add_argument('--test-query', help='Test retrieval with a query')
     parser.add_argument('--debug', action='store_true')
     
     args = parser.parse_args()
     
-    print("💾 Crystal Cluster v1.1")
+    print("💾 Crystal Cluster beta")
+    if args.dual_chunk:
+        print("🔀 Dual-chunk mode enabled")    
     print("━" * 42)
     
-    cluster = CrystalCluster(log_level=logging.DEBUG if args.debug else logging.INFO)
+    cluster = CrystalCluster(
+        log_level=logging.DEBUG if args.debug else logging.INFO,
+        use_dual_chunk=args.dual_chunk
+    )
     
     documents = cluster.load_documents(args.json_file)
     
@@ -999,7 +1710,20 @@ if __name__ == "__main__":
         password=args.neo4j_pass,
         url=args.neo4j_uri
     )
-    
-    cluster.commit_to_graph(documents, graph_store)
+
+    if args.dual_chunk:
+        # デュアルチャンクモード
+        result = cluster.commit_to_graph_with_retrieval(documents, graph_store)
+        
+        # テストクエリがあれば検索
+        if args.test_query:
+            print(f"\n🔍 Testing retrieval: '{args.test_query}'")
+            hits = cluster.retrieve(result['retrieval_store'], args.test_query, top_k=3)
+            for i, (score, doc) in enumerate(hits, 1):
+                print(f"\n{i}. Score: {score:.3f}")
+                print(f"   {doc.text[:150]}...")
+    else:
+
+        cluster.commit_to_graph(documents, graph_store)
     
     print("✨ Complete!")
