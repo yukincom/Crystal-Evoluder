@@ -1,7 +1,7 @@
 # 開発メモ
 - 二つのファイルの結合　✅　11/25 → 11/28再分割
 - Grobid統合　✅　11/27
-- PDF以外のデータ ✅  11/26<br>
+- PDF以外のデータ ALL✅  11/26<br>
    TEI (.tei.xml)<br>
    Markdown (.md) - frontmatter対応、見出し分割<br>
    DOCX (.docx) - 見出しスタイル検出<br>
@@ -14,6 +14,12 @@
 - Neo4jスキーマ　✅　11/28
 - データ分割後テスト　✅　12/2
 - dual-chunk　✅ 12/4
+- RetrievalとGraphの同期 - chunk_idで紐付け
+- 同一実体の別名問題 - Entity Linking
+- トリプレット欠落 - 後処理フィルタ + LLM切り替え
+- 重みのスケール - 正規化処理
+- Multi-hop深さ - 動的拡張
+- Self-RAG - 自己修正機構
 - マージ追加
 - Data Provenance
 
