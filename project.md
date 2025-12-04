@@ -1,4 +1,4 @@
-# 開発計画
+# 開発メモ
 - 二つのファイルの結合　✅　11/25 → 11/28再分割
 - Grobid統合　✅　11/27
 - PDF以外のデータ ✅  11/26<br>
@@ -12,6 +12,7 @@
 - ログの階層化 ✅  11/26
 - エラーリカバリ　✅　11/28
 - Neo4jスキーマ　✅　11/28
+- dual-chunk　✅ 12/4
 - マージ追加
 - Data Provenance
 
@@ -21,7 +22,6 @@
 - Dual-Chunkは「チャンクの切り方」しか変えない。gpt-4o-miniが「Self-Attention → uses → Scaled Dot-Product Attention」を見逃したり、「is a type of」と「is based on」を逆に抜いたりはLLMの抽出能力の問題。
 - ->Self-RAG / CRITIC風自己修正 ・トリプレット抽出にQwen2.5-32BやClaude-3.5-Sonnetに変更 
 - 後処理でrelation_compatibilityで低スコアトリプレットをフィルタ
-
 ### 同一実体の別名問題（Coreference）
 - 「Self-Attention」「the attention mechanism」「it」が同じものを指すのに別ノードになる。
 - Dual-Chunkではチャンク内に収まっていても、実体連結ができない。
@@ -38,7 +38,6 @@
 - 小さい論文では重みが全部0.01以下になり、agentが「全部同じ」と勘違い。
 - ->論文ごとに重みを正規化（min-max or z-score） 
 - 最終重みをlogスケールに変換
-
 [RetrievalとGraphの同期ズレ問題]
 - Retrieval storeで取ってきた文脈と、Neo4jのKGが同じチャンクから来ていないと、agentが「文脈はあるのにパスがない」状態になる。
 - ->retrieval_docsとgraph_docsに共通のchunk_idを付与 
