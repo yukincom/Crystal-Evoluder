@@ -17,34 +17,32 @@
 
 ## 見落としていた問題点　12/4
 2024年6月21日[AI生成コンテンツの検索拡張生成 ：調査](https://arxiv.org/html/2402.19473v6)
-[トリプレットの欠落・ノイズ]
-Dual-Chunkは「チャンクの切り方」しか変えない。gpt-4o-miniが「Self-Attention → uses → Scaled Dot-Product Attention」を見逃したり、「is a type of」と「is based on」を逆に抜いたりはLLMの抽出能力の問題。
-->Self-RAG / CRITIC風自己修正 ・トリプレット抽出にQwen2.5-32BやClaude-3.5-Sonnetに変更 
-後処理でrelation_compatibilityで低スコアトリプレットをフィルタ
+### トリプレットの欠落・ノイズ
+- Dual-Chunkは「チャンクの切り方」しか変えない。gpt-4o-miniが「Self-Attention → uses → Scaled Dot-Product Attention」を見逃したり、「is a type of」と「is based on」を逆に抜いたりはLLMの抽出能力の問題。
+- ->Self-RAG / CRITIC風自己修正 ・トリプレット抽出にQwen2.5-32BやClaude-3.5-Sonnetに変更 
+- 後処理でrelation_compatibilityで低スコアトリプレットをフィルタ
 
-[同一実体の別名問題（Coreference）]
-「Self-Attention」「the attention mechanism」「it」が同じものを指すのに別ノードになる。
-Dual-Chunkではチャンク内に収まっていても、実体連結ができない。
-Neo4jに「Self-Attention」が5個ノードできて、重みが分散 → パスが取れなくなる。
-->Coreference Resolution（NeuralCorefやspacyのcorefモデル） 
-抽出後にentity linking（nomic-embed-textで類似度0.95以上はマージ）
-[Multi-hopの深さ不足]
-たとえ重みが完璧でも、agentic_retrieve()のmax_steps=5だと6hop以上の論理は取れない（例：Attention → Scaled Dot-Product → softmax → normalization → stability）。
-複雑な論文質問で「なぜstableなのか？」が答えられない。
-->max_stepsを動的に拡張（confidence < 0.7なら+2）
-Graph-S³風のaction spaceに「expand_hop」追加
-[重みのスケールがバラバラ]
-intra_rawとinter_rawの絶対値が論文ごとに100倍違うことがある =0.7intra + 0.3interの係数が意味をなさない。
-小さい論文では重みが全部0.01以下になり、agentが「全部同じ」と勘違い。
-->論文ごとに重みを正規化（min-max or z-score） 
-最終重みをlogスケールに変換
+### 同一実体の別名問題（Coreference）
+- 「Self-Attention」「the attention mechanism」「it」が同じものを指すのに別ノードになる。
+- Dual-Chunkではチャンク内に収まっていても、実体連結ができない。
+- Neo4jに「Self-Attention」が5個ノードできて、重みが分散 → パスが取れなくなる。
+- ->Coreference Resolution（NeuralCorefやspacyのcorefモデル） 
+- 抽出後にentity linking（nomic-embed-textで類似度0.95以上はマージ）
+### Multi-hopの深さ不足
+- たとえ重みが完璧でも、agentic_retrieve()のmax_steps=5だと6hop以上の論理は取れない（例：Attention → Scaled Dot-Product → softmax → normalization → stability）。
+- 複雑な論文質問で「なぜstableなのか？」が答えられない。
+- ->max_stepsを動的に拡張（confidence < 0.7なら+2）
+- Graph-S³風のaction spaceに「expand_hop」追加
+### 重みのスケールがバラバラ
+- intra_rawとinter_rawの絶対値が論文ごとに100倍違うことがある =0.7intra + 0.3interの係数が意味をなさない。
+- 小さい論文では重みが全部0.01以下になり、agentが「全部同じ」と勘違い。
+- ->論文ごとに重みを正規化（min-max or z-score） 
+- 最終重みをlogスケールに変換
 
 [RetrievalとGraphの同期ズレ問題]
-Retrieval storeで取ってきた文脈と、Neo4jのKGが同じチャンクから来ていないと、agentが「文脈はあるのにパスがない」状態になる。
-->retrieval_docsとgraph_docsに共通のchunk_idを付与 
-retrieve()が返すDocumentにgraph_node_idsリストを持たせる
-
-
+- Retrieval storeで取ってきた文脈と、Neo4jのKGが同じチャンクから来ていないと、agentが「文脈はあるのにパスがない」状態になる。
+- ->retrieval_docsとgraph_docsに共通のchunk_idを付与 
+- retrieve()が返すDocumentにgraph_node_idsリストを持たせる
 
 ## この辺を突っ込んだ 12/2
 [知識グラフ質問応答のための効率的かつ一般化可能なグラフ検索器の学習](https://arxiv.org/abs/2506.09645 )2025年6月11日提出<br>
