@@ -1,0 +1,362 @@
+2025-12-03 00:36:04,793 - INFO - Crystal Cluster v1.1 initialized
+2025-12-03 09:03:06,331 - INFO - Crystal Cluster v1.1 initialized
+2025-12-03 09:03:06,333 - INFO - 📂 Loaded 2 documents (2 from JSON, 0 raw texts)
+2025-12-03 09:17:15,090 - INFO - Crystal Cluster v1.1 initialized
+2025-12-03 09:17:15,091 - INFO - 📂 Loaded 2 documents (2 from JSON, 0 raw texts)
+2025-12-03 09:20:06,501 - INFO - Crystal Cluster v1.1 initialized
+2025-12-03 09:20:06,502 - INFO - 📂 Loaded 2 documents (2 from JSON, 0 raw texts)
+2025-12-03 09:30:07,332 - INFO - Crystal Cluster v1.1 initialized
+2025-12-03 09:30:07,332 - INFO - 📂 Loaded 2 documents (2 from JSON, 0 raw texts)
+2025-12-03 09:42:48,924 - INFO - Crystal Cluster v1.1 initialized
+2025-12-03 09:42:48,925 - INFO - 📂 Loaded 2 documents (2 from JSON, 0 raw texts)
+2025-12-03 09:43:20,196 - INFO - Crystal Cluster v1.1 initialized
+2025-12-03 09:43:20,197 - INFO - 📂 Loaded 2 documents (2 from JSON, 0 raw texts)
+2025-12-03 09:44:33,874 - INFO - Crystal Cluster v1.1 initialized
+2025-12-03 09:44:33,875 - INFO - 📂 Loaded 2 documents (2 from JSON, 0 raw texts)
+2025-12-03 09:45:29,267 - INFO - Crystal Cluster v1.1 initialized
+2025-12-03 09:45:29,268 - INFO - 📂 Loaded 2 documents (2 from JSON, 0 raw texts)
+2025-12-03 09:46:02,034 - INFO - Crystal Cluster v1.1 initialized
+2025-12-03 09:46:02,036 - INFO - 📂 Loaded 2 documents (2 from JSON, 0 raw texts)
+2025-12-03 12:46:18,612 - INFO - Crystal Cluster v1.1 initialized
+2025-12-03 12:46:18,614 - INFO - 📂 Loaded 2 documents (2 from JSON, 0 raw texts)
+2025-12-03 12:46:53,956 - INFO - Crystal Cluster v1.1 initialized
+2025-12-03 12:46:53,956 - INFO - 📂 Loaded 2 documents (2 from JSON, 0 raw texts)
+2025-12-03 12:46:54,180 - INFO - ✅ Neo4j connection verified
+2025-12-03 12:46:54,181 - INFO - ▶ Graph Generation
+2025-12-03 12:47:10,098 - INFO - ✅ Initial graph: 0 nodes, 0 edges
+2025-12-03 12:47:10,098 - INFO - ✓ Graph Generation (15.92s)
+2025-12-03 12:47:10,098 - INFO - ▶ Merging Path Information
+2025-12-03 12:47:10,098 - INFO - ✅ Path info merged: 0 nodes, 0 edges
+2025-12-03 12:47:10,098 - INFO - ✓ Merging Path Information (0.00s)
+2025-12-03 12:47:10,098 - INFO - ▶ Graph Optimization (RAPL)
+2025-12-03 12:47:10,098 - INFO - Total triples: 0
+2025-12-03 12:47:10,098 - INFO - Computing intra-interactions...
+2025-12-03 12:47:10,098 - INFO - ✅ Intra-document processing complete: 0 succeeded, 0 skipped
+2025-12-03 12:47:10,098 - INFO - Added 0 intra-document edges
+2025-12-03 12:47:10,099 - INFO - Computing inter-interactions (optimized)...
+2025-12-03 12:47:10,099 - INFO - Built entity index: 0 unique entities
+2025-12-03 12:47:10,099 - INFO - ✅ Inter-document processing complete: 0 succeeded, 0 skipped
+2025-12-03 12:47:10,099 - INFO - Added 0 meaningful inter-interactions
+2025-12-03 12:47:10,099 - INFO - Computing document-level connections...
+2025-12-03 12:47:10,099 - INFO - Added 0 inter-document links
+2025-12-03 12:47:10,099 - INFO - Finalizing edge weights...
+2025-12-03 12:47:10,099 - INFO - ✅ Optimized graph: 0 nodes, 0 edges
+2025-12-03 12:47:10,099 - INFO - ✓ Graph Optimization (RAPL) (0.00s)
+2025-12-03 12:47:10,099 - INFO - ▶ Updating Neo4j
+2025-12-03 12:47:10,099 - INFO - ✅ Neo4j edge update complete: 0 succeeded, 0 skipped
+2025-12-03 12:47:10,100 - INFO - ✓ Updating Neo4j (0.00s)
+2025-12-03 12:47:10,100 - ERROR - 🚨 Neo4j update failed: KeyError
+   Message: 'updated'
+   Graph was optimized but not persisted to database!
+2025-12-03 12:53:17,833 - INFO - Crystal Cluster v1.1 initialized
+2025-12-03 12:53:17,836 - INFO - 📂 Loaded 6 documents (6 from JSON, 0 raw texts)
+2025-12-03 12:53:17,915 - INFO - ✅ Neo4j connection verified
+2025-12-03 12:53:17,915 - INFO - ▶ Graph Generation
+2025-12-03 12:53:49,889 - INFO - ✅ Initial graph: 0 nodes, 0 edges
+2025-12-03 12:53:49,889 - INFO - ✓ Graph Generation (31.97s)
+2025-12-03 12:53:49,889 - INFO - ▶ Merging Path Information
+2025-12-03 12:53:49,889 - INFO - ✅ Path info merged: 0 nodes, 0 edges
+2025-12-03 12:53:49,889 - INFO - ✓ Merging Path Information (0.00s)
+2025-12-03 12:53:49,889 - INFO - ▶ Graph Optimization (RAPL)
+2025-12-03 12:53:49,890 - INFO - Total triples: 0
+2025-12-03 12:53:49,890 - INFO - Computing intra-interactions...
+2025-12-03 12:53:49,890 - INFO - ✅ Intra-document processing complete: 0 succeeded, 0 skipped
+2025-12-03 12:53:49,890 - INFO - Added 0 intra-document edges
+2025-12-03 12:53:49,890 - INFO - Computing inter-interactions (optimized)...
+2025-12-03 12:53:49,890 - INFO - Built entity index: 0 unique entities
+2025-12-03 12:53:49,890 - INFO - ✅ Inter-document processing complete: 0 succeeded, 0 skipped
+2025-12-03 12:53:49,890 - INFO - Added 0 meaningful inter-interactions
+2025-12-03 12:53:49,890 - INFO - Computing document-level connections...
+2025-12-03 12:53:49,890 - INFO - Added 0 inter-document links
+2025-12-03 12:53:49,890 - INFO - Finalizing edge weights...
+2025-12-03 12:53:49,890 - INFO - ✅ Optimized graph: 0 nodes, 0 edges
+2025-12-03 12:53:49,890 - INFO - ✓ Graph Optimization (RAPL) (0.00s)
+2025-12-03 12:53:49,890 - INFO - ▶ Updating Neo4j
+2025-12-03 12:53:49,890 - INFO - ✅ Neo4j edge update complete: 0 succeeded, 0 skipped
+2025-12-03 12:53:49,890 - INFO - ✓ Updating Neo4j (0.00s)
+2025-12-03 12:53:49,890 - ERROR - 🚨 Neo4j update failed: KeyError
+   Message: 'updated'
+   Graph was optimized but not persisted to database!
+2025-12-03 13:02:34,235 - INFO - Crystal Cluster v1.1 initialized
+2025-12-03 13:02:34,237 - INFO - 📂 Loaded 6 documents (6 from JSON, 0 raw texts)
+2025-12-03 13:02:34,327 - INFO - ✅ Neo4j connection verified
+2025-12-03 13:02:34,327 - INFO - ▶ Graph Generation
+2025-12-03 13:03:00,109 - INFO - ✅ Initial graph: 0 nodes, 0 edges
+2025-12-03 13:03:00,109 - INFO - ✓ Graph Generation (25.78s)
+2025-12-03 13:03:00,109 - INFO - ▶ Merging Path Information
+2025-12-03 13:03:00,110 - INFO - ✅ Path info merged: 0 nodes, 0 edges
+2025-12-03 13:03:00,110 - INFO - ✓ Merging Path Information (0.00s)
+2025-12-03 13:03:00,110 - INFO - ▶ Graph Optimization (RAPL)
+2025-12-03 13:03:00,110 - INFO - Total triples: 0
+2025-12-03 13:03:00,110 - INFO - Computing intra-interactions...
+2025-12-03 13:03:00,110 - INFO - ✅ Intra-document processing complete: 0 succeeded, 0 skipped
+2025-12-03 13:03:00,110 - INFO - Added 0 intra-document edges
+2025-12-03 13:03:00,110 - INFO - Computing inter-interactions (optimized)...
+2025-12-03 13:03:00,110 - INFO - Built entity index: 0 unique entities
+2025-12-03 13:03:00,110 - INFO - ✅ Inter-document processing complete: 0 succeeded, 0 skipped
+2025-12-03 13:03:00,110 - INFO - Added 0 meaningful inter-interactions
+2025-12-03 13:03:00,110 - INFO - Computing document-level connections...
+2025-12-03 13:03:00,110 - INFO - Added 0 inter-document links
+2025-12-03 13:03:00,110 - INFO - Finalizing edge weights...
+2025-12-03 13:03:00,110 - INFO - ✅ Optimized graph: 0 nodes, 0 edges
+2025-12-03 13:03:00,110 - INFO - ✓ Graph Optimization (RAPL) (0.00s)
+2025-12-03 13:03:00,110 - INFO - ▶ Updating Neo4j
+2025-12-03 13:03:00,110 - INFO - ✅ Neo4j edge update complete: 0 succeeded, 0 skipped
+2025-12-03 13:03:00,111 - INFO - ✅ Neo4j update complete:
+   - Updated: 0 edges
+   - Skipped: 0 edges
+   - Failed: 0 edges
+2025-12-03 13:03:00,111 - INFO - ✓ Updating Neo4j (0.00s)
+2025-12-03 14:05:32,625 - INFO - Crystal Cluster v1.1 initialized
+2025-12-03 14:05:32,626 - INFO - 📂 Loaded 6 documents (6 from JSON, 0 raw texts)
+2025-12-03 14:05:32,895 - INFO - ✅ Neo4j connection verified
+2025-12-03 14:05:32,895 - INFO - ▶ Graph Generation
+2025-12-03 14:06:01,724 - INFO - ✅ Initial graph: 0 nodes, 0 edges
+2025-12-03 14:06:01,724 - INFO - ✓ Graph Generation (28.83s)
+2025-12-03 14:06:01,724 - INFO - ▶ Merging Path Information
+2025-12-03 14:06:01,724 - INFO - ✅ Path info merged: 0 nodes, 0 edges
+2025-12-03 14:06:01,724 - INFO - ✓ Merging Path Information (0.00s)
+2025-12-03 14:06:01,725 - INFO - ▶ Graph Optimization (RAPL)
+2025-12-03 14:06:01,725 - INFO - Total triples: 0
+2025-12-03 14:06:01,725 - INFO - Computing intra-interactions...
+2025-12-03 14:06:01,725 - INFO - ✅ Intra-document processing complete: 0 succeeded, 0 skipped
+2025-12-03 14:06:01,725 - INFO - Added 0 intra-document edges
+2025-12-03 14:06:01,725 - INFO - Computing inter-interactions (optimized)...
+2025-12-03 14:06:01,725 - INFO - Built entity index: 0 unique entities
+2025-12-03 14:06:01,725 - INFO - ✅ Inter-document processing complete: 0 succeeded, 0 skipped
+2025-12-03 14:06:01,725 - INFO - Added 0 meaningful inter-interactions
+2025-12-03 14:06:01,725 - INFO - Computing document-level connections...
+2025-12-03 14:06:01,725 - INFO - Added 0 inter-document links
+2025-12-03 14:06:01,725 - INFO - Finalizing edge weights...
+2025-12-03 14:06:01,725 - INFO - ✅ Optimized graph: 0 nodes, 0 edges
+2025-12-03 14:06:01,725 - INFO - ✓ Graph Optimization (RAPL) (0.00s)
+2025-12-03 14:06:01,725 - INFO - ▶ Updating Neo4j
+2025-12-03 14:06:01,726 - INFO - ✅ Neo4j edge update complete: 0 succeeded, 0 skipped
+2025-12-03 14:06:01,726 - INFO - ✅ Neo4j update complete:
+   - Updated: 0 edges
+   - Skipped: 0 edges
+   - Failed: 0 edges
+2025-12-03 14:06:01,726 - INFO - ✓ Updating Neo4j (0.00s)
+2025-12-03 14:46:58,390 - INFO - Crystal Cluster v1.1 initialized
+2025-12-03 14:46:58,391 - INFO - 📂 Loaded 6 documents (6 from JSON, 0 raw texts)
+2025-12-03 14:46:58,455 - INFO - ✅ Neo4j connection verified
+2025-12-03 14:46:58,455 - INFO - ▶ Graph Generation
+2025-12-03 14:46:58,456 - INFO - Building local knowledge graph...
+2025-12-03 14:47:23,989 - INFO - ✅ Initial graph: 99 nodes, 60 edges
+2025-12-03 14:47:23,990 - INFO - ✓ Graph Generation (25.53s)
+2025-12-03 14:47:23,990 - ERROR - 🚨 Graph generation failed: AttributeError
+   Message: 'list' object has no attribute 'items'
+   This might be due to: LLM API issues, invalid documents, or embedding model errors
+2025-12-03 14:52:47,116 - INFO - Crystal Cluster v1.1 initialized
+2025-12-03 14:52:47,118 - INFO - 📂 Loaded 6 documents (6 from JSON, 0 raw texts)
+2025-12-03 14:52:47,241 - INFO - ✅ Neo4j connection verified
+2025-12-03 14:52:47,241 - INFO - ▶ Graph Generation
+2025-12-03 14:52:47,243 - INFO - Building local knowledge graph...
+2025-12-03 14:53:12,868 - INFO - ✅ Initial graph: 99 nodes, 60 edges
+2025-12-03 14:53:12,870 - DEBUG - rel_map structure: <class 'dict'>
+2025-12-03 14:53:12,870 - INFO - Extracted 60 triples total
+2025-12-03 14:53:12,870 - INFO - ✓ Graph Generation (25.63s)
+2025-12-03 14:53:12,870 - INFO - ▶ Merging Path Information
+2025-12-03 14:53:12,870 - INFO - ✅ Path info merged: 99 nodes, 60 edges
+2025-12-03 14:53:12,870 - INFO - ✓ Merging Path Information (0.00s)
+2025-12-03 14:53:12,870 - INFO - ▶ Graph Optimization (RAPL)
+2025-12-03 14:53:12,870 - INFO - Total triples: 360
+2025-12-03 14:53:12,871 - INFO - Computing intra-interactions...
+2025-12-03 14:53:13,073 - INFO - ✅ Intra-document processing complete: 10620 succeeded, 0 skipped
+2025-12-03 14:53:13,073 - INFO - Added 0 intra-document edges
+2025-12-03 14:53:13,073 - INFO - Computing inter-interactions (optimized)...
+2025-12-03 14:53:13,073 - INFO - Built entity index: 99 unique entities
+2025-12-03 14:53:13,078 - INFO - ✅ Inter-document processing complete: 2088 succeeded, 0 skipped
+2025-12-03 14:53:13,078 - INFO - Added 2088 meaningful inter-interactions
+2025-12-03 14:53:13,078 - INFO - Computing document-level connections...
+2025-12-03 14:53:13,078 - INFO - Top bridge entities:
+2025-12-03 14:53:13,078 - INFO -   'Deep learning': 6 documents
+2025-12-03 14:53:13,078 - INFO -   'Machine learning': 6 documents
+2025-12-03 14:53:13,078 - INFO -   'Artificial neural networks': 6 documents
+2025-12-03 14:53:13,078 - INFO -   'Computer vision': 6 documents
+2025-12-03 14:53:13,078 - INFO -   'Systems to recognize objects': 6 documents
+2025-12-03 14:53:13,078 - INFO - Added 15 inter-document links
+2025-12-03 14:53:13,078 - INFO - Finalizing edge weights...
+2025-12-03 14:53:13,079 - INFO - ✅ Optimized graph: 105 nodes, 75 edges
+2025-12-03 14:53:13,079 - INFO - ✓ Graph Optimization (RAPL) (0.21s)
+2025-12-03 14:53:13,079 - INFO - ▶ Updating Neo4j
+2025-12-03 14:53:13,588 - INFO - ✅ Neo4j edge update complete: 60 succeeded, 15 skipped
+2025-12-03 14:53:13,589 - INFO - ✅ Neo4j update complete:
+   - Updated: 60 edges
+   - Skipped: 15 edges
+   - Failed: 0 edges
+2025-12-03 14:53:13,589 - INFO - ✓ Updating Neo4j (0.51s)
+2025-12-04 15:51:56,892 - INFO - Crystal Cluster beta initialized (dual-chunk: disabled)
+2025-12-04 15:51:56,902 - INFO - 📂 Loaded 6 documents (6 from JSON, 0 raw texts)
+2025-12-04 15:51:57,190 - INFO - ✅ Neo4j connection verified
+2025-12-04 15:51:57,190 - INFO - ▶ Graph Generation
+2025-12-04 15:51:57,195 - INFO - Building local knowledge graph...
+2025-12-04 15:52:27,237 - INFO - ✅ Initial graph: 99 nodes, 60 edges
+2025-12-04 15:52:27,238 - DEBUG - rel_map structure: <class 'dict'>
+2025-12-04 15:52:27,238 - INFO - Extracted 60 triples total
+2025-12-04 15:52:27,238 - INFO - ✓ Graph Generation (30.05s)
+2025-12-04 15:52:27,238 - INFO - ▶ Entity Linking
+2025-12-04 15:52:27,238 - INFO - 🔗 Starting entity linking (threshold=0.95)
+2025-12-04 15:52:33,496 - INFO -   → Found 99 clusters from 99 entities
+2025-12-04 15:52:33,496 - INFO -   → 0 entities will be merged
+2025-12-04 15:52:33,496 - INFO - ✅ Entity linking complete: 99 → 99 nodes
+2025-12-04 15:52:33,496 - INFO - Updated triples: 60 → 60
+2025-12-04 15:52:33,496 - INFO - ✓ Entity Linking (6.26s)
+2025-12-04 15:52:33,496 - INFO - ▶ Merging Path Information
+2025-12-04 15:52:33,496 - INFO - ✅ Path info merged: 99 nodes, 60 edges
+2025-12-04 15:52:33,496 - INFO - ✓ Merging Path Information (0.00s)
+2025-12-04 15:52:33,496 - INFO - ▶ Graph Optimization (RAPL)
+2025-12-04 15:52:33,497 - INFO - Total triples: 360
+2025-12-04 15:52:33,497 - INFO - Computing intra-interactions...
+2025-12-04 15:52:33,675 - INFO - ✅ Intra-document processing complete: 10620 succeeded, 0 skipped
+2025-12-04 15:52:33,675 - INFO - Added 0 intra-document edges
+2025-12-04 15:52:33,675 - INFO - Computing inter-interactions (optimized)...
+2025-12-04 15:52:33,675 - INFO - Built entity index: 99 unique entities
+2025-12-04 15:52:33,680 - INFO - ✅ Inter-document processing complete: 2088 succeeded, 0 skipped
+2025-12-04 15:52:33,680 - INFO - Added 2088 meaningful inter-interactions
+2025-12-04 15:52:33,680 - INFO - Computing document-level connections...
+2025-12-04 15:52:33,680 - INFO - Top bridge entities:
+2025-12-04 15:52:33,680 - INFO -   'Deep learning': 6 documents
+2025-12-04 15:52:33,680 - INFO -   'Machine learning': 6 documents
+2025-12-04 15:52:33,680 - INFO -   'Artificial neural networks': 6 documents
+2025-12-04 15:52:33,680 - INFO -   'Computer vision': 6 documents
+2025-12-04 15:52:33,680 - INFO -   'Systems to recognize objects': 6 documents
+2025-12-04 15:52:33,680 - INFO - Added 15 inter-document links
+2025-12-04 15:52:33,680 - INFO - Finalizing edge weights...
+2025-12-04 15:52:33,680 - INFO - ✅ Optimized graph: 105 nodes, 75 edges
+2025-12-04 15:52:33,680 - INFO - ✓ Graph Optimization (RAPL) (0.18s)
+2025-12-04 15:52:33,680 - INFO - ▶ Updating Neo4j
+2025-12-04 15:52:34,387 - INFO - ✅ Neo4j edge update complete: 60 succeeded, 15 skipped
+2025-12-04 15:52:34,388 - INFO - ✅ Neo4j update complete:
+   - Updated: 60 edges
+   - Skipped: 15 edges
+   - Failed: 0 edges
+2025-12-04 15:52:34,388 - INFO - ✓ Updating Neo4j (0.71s)
+2025-12-04 16:03:47,782 - INFO - Crystal Cluster beta initialized (dual-chunk: enabled)
+2025-12-04 16:03:47,787 - INFO - 📂 Loaded 6 documents (6 from JSON, 0 raw texts)
+2025-12-04 16:03:47,848 - INFO - ▶ Dual-Index Building
+2025-12-04 16:03:47,917 - INFO - 📄 Created 6 graph chunks, 6 retrieval chunks
+2025-12-04 16:03:47,917 - INFO - 📊 Building knowledge graph...
+2025-12-04 16:03:47,921 - INFO - ✅ Neo4j connection verified
+2025-12-04 16:03:47,921 - INFO -   ▶ Graph Generation
+2025-12-04 16:03:47,922 - INFO - Building local knowledge graph...
+2025-12-04 16:04:19,748 - INFO - ✅ Initial graph: 97 nodes, 60 edges
+2025-12-04 16:04:19,749 - DEBUG - rel_map structure: <class 'dict'>
+2025-12-04 16:04:19,749 - INFO - Extracted 60 triples total
+2025-12-04 16:04:19,750 - INFO -   ✓ Graph Generation (31.83s)
+2025-12-04 16:04:19,750 - INFO -   ▶ Entity Linking
+2025-12-04 16:04:19,750 - INFO - 🔗 Starting entity linking (threshold=0.95)
+2025-12-04 16:04:22,673 - INFO -   → Found 97 clusters from 97 entities
+2025-12-04 16:04:22,673 - INFO -   → 0 entities will be merged
+2025-12-04 16:04:22,673 - INFO - ✅ Entity linking complete: 97 → 97 nodes
+2025-12-04 16:04:22,673 - INFO - Updated triples: 60 → 60
+2025-12-04 16:04:22,673 - INFO -   ✓ Entity Linking (2.92s)
+2025-12-04 16:04:22,673 - INFO -   ▶ Merging Path Information
+2025-12-04 16:04:22,673 - INFO - ✅ Path info merged: 97 nodes, 60 edges
+2025-12-04 16:04:22,673 - INFO -   ✓ Merging Path Information (0.00s)
+2025-12-04 16:04:22,673 - INFO -   ▶ Graph Optimization (RAPL)
+2025-12-04 16:04:22,673 - INFO - Total triples: 360
+2025-12-04 16:04:22,673 - INFO - Computing intra-interactions...
+2025-12-04 16:04:22,844 - INFO - ✅ Intra-document processing complete: 10620 succeeded, 0 skipped
+2025-12-04 16:04:22,844 - INFO - Added 0 intra-document edges
+2025-12-04 16:04:22,844 - INFO - Computing inter-interactions (optimized)...
+2025-12-04 16:04:22,844 - INFO - Built entity index: 97 unique entities
+2025-12-04 16:04:22,849 - INFO - ✅ Inter-document processing complete: 2160 succeeded, 0 skipped
+2025-12-04 16:04:22,849 - INFO - Added 2160 meaningful inter-interactions
+2025-12-04 16:04:22,849 - INFO - Computing document-level connections...
+2025-12-04 16:04:22,850 - INFO - Top bridge entities:
+2025-12-04 16:04:22,850 - INFO -   'Deep learning': 6 documents
+2025-12-04 16:04:22,850 - INFO -   'Machine learning': 6 documents
+2025-12-04 16:04:22,850 - INFO -   'Artificial neural networks': 6 documents
+2025-12-04 16:04:22,850 - INFO -   'Computer vision': 6 documents
+2025-12-04 16:04:22,850 - INFO -   'Natural language processing': 6 documents
+2025-12-04 16:04:22,850 - INFO - Added 15 inter-document links
+2025-12-04 16:04:22,850 - INFO - Finalizing edge weights...
+2025-12-04 16:04:22,850 - INFO - ✅ Optimized graph: 103 nodes, 75 edges
+2025-12-04 16:04:22,850 - INFO -   ✓ Graph Optimization (RAPL) (0.18s)
+2025-12-04 16:04:22,850 - INFO -   ▶ Updating Neo4j
+2025-12-04 16:04:23,232 - INFO - ✅ Neo4j edge update complete: 60 succeeded, 15 skipped
+2025-12-04 16:04:23,233 - INFO - ✅ Neo4j update complete:
+   - Updated: 60 edges
+   - Skipped: 15 edges
+   - Failed: 0 edges
+2025-12-04 16:04:23,233 - INFO -   ✓ Updating Neo4j (0.38s)
+2025-12-04 16:04:23,233 - INFO - 🔍 Building retrieval store...
+2025-12-04 16:04:23,233 - INFO - 🔍 Building retrieval embeddings...
+2025-12-04 16:04:24,191 - INFO - ✅ Retrieval embedding generation complete: 6 succeeded, 0 skipped
+2025-12-04 16:04:24,191 - INFO - ✅ Built retrieval store: 6 docs
+2025-12-04 16:04:24,191 - INFO - ✓ Dual-Index Building (36.34s)
+2025-12-04 17:55:01,284 - INFO - Crystal Cluster beta initialized
+2025-12-04 17:55:01,286 - INFO - Config: {'entity_linking_threshold': 0.88, 'retrieval_chunk_size': 512, 'retrieval_chunk_overlap': 100, 'graph_chunk_size': 512, 'graph_chunk_overlap': 50, 'relation_compat_threshold': 0.08, 'final_weight_cutoff': 0.02, 'max_triplets_per_chunk': 15, 'llm_model': 'gpt-4o-mini', 'llm_timeout': 120.0}
+2025-12-04 17:55:01,287 - INFO - 📂 Loaded 6 documents (6 from JSON, 0 raw texts)
+2025-12-04 17:55:01,336 - INFO - ▶ Dual-Index Building
+2025-12-04 17:55:01,398 - INFO - Splitters: graph=512, retrieval=512
+2025-12-04 17:55:01,402 - INFO - 📄 Created 6 graph chunks, 6 retrieval chunks
+2025-12-04 17:55:01,402 - INFO - 📊 Building knowledge graph...
+2025-12-04 17:55:01,404 - INFO - ✅ Neo4j connection verified
+2025-12-04 17:55:01,404 - INFO -   ▶ Graph Generation
+2025-12-04 17:55:01,405 - INFO - Building local knowledge graph...
+2025-12-04 17:55:30,293 - INFO - ✅ Initial graph: 133 nodes, 90 edges
+2025-12-04 17:55:30,293 - DEBUG - rel_map structure: <class 'dict'>
+2025-12-04 17:55:30,293 - INFO - Extracted 90 triples total
+2025-12-04 17:55:30,293 - INFO -   ✓ Graph Generation (28.89s)
+2025-12-04 17:55:30,293 - INFO -   ▶ Entity Linking
+2025-12-04 17:55:30,293 - INFO - 🔗 Starting entity linking (threshold=0.88)
+2025-12-04 17:55:33,541 - INFO -   → Found 128 clusters from 133 entities
+2025-12-04 17:55:33,541 - DEBUG -   Cluster: ['Artificial neural networks', 'Neural networks'] → Canonical: 'Artificial neural networks'
+2025-12-04 17:55:33,541 - DEBUG -   Cluster: ['Vector databases', 'Vector database'] → Canonical: 'Vector database'
+2025-12-04 17:55:33,541 - DEBUG -   Cluster: ['Graph rag', 'Graph rag systems', 'Graph rag applications'] → Canonical: 'Graph rag'
+2025-12-04 17:55:33,541 - DEBUG -   Cluster: ['Graph structures', 'Graph structure'] → Canonical: 'Graph structures'
+2025-12-04 17:55:33,541 - INFO -   → 5 entities will be merged
+2025-12-04 17:55:33,541 - INFO - ✅ Entity linking complete: 133 → 128 nodes
+2025-12-04 17:55:33,541 - INFO - Updated triples: 90 → 90
+2025-12-04 17:55:33,542 - INFO -   ✓ Entity Linking (3.25s)
+2025-12-04 17:55:33,542 - INFO -   ▶ Merging Path Information
+2025-12-04 17:55:33,542 - INFO - ✅ Path info merged: 128 nodes, 89 edges
+2025-12-04 17:55:33,542 - INFO -   ✓ Merging Path Information (0.00s)
+2025-12-04 17:55:33,542 - INFO -   ▶ Graph Optimization (RAPL)
+2025-12-04 17:55:33,542 - INFO - Total triples: 540
+2025-12-04 17:55:33,542 - INFO - Computing intra-interactions...
+2025-12-04 17:55:33,975 - INFO - ✅ Intra-document processing complete: 24030 succeeded, 0 skipped
+2025-12-04 17:55:33,975 - INFO - Added 0 intra-document edges
+2025-12-04 17:55:33,975 - INFO - Computing inter-interactions (optimized)...
+2025-12-04 17:55:33,975 - INFO - Built entity index: 128 unique entities
+2025-12-04 17:55:33,990 - INFO - ✅ Inter-document processing complete: 6030 succeeded, 0 skipped
+2025-12-04 17:55:33,990 - INFO - Added 6030 meaningful inter-interactions
+2025-12-04 17:55:33,990 - INFO - Computing document-level connections...
+2025-12-04 17:55:33,990 - INFO - Top bridge entities:
+2025-12-04 17:55:33,990 - INFO -   'Deep learning': 6 documents
+2025-12-04 17:55:33,990 - INFO -   'Machine learning': 6 documents
+2025-12-04 17:55:33,990 - INFO -   'Artificial neural networks': 6 documents
+2025-12-04 17:55:33,990 - INFO -   'Computer vision': 6 documents
+2025-12-04 17:55:33,990 - INFO -   'Systems to recognize objects': 6 documents
+2025-12-04 17:55:33,991 - INFO - Added 15 inter-document links
+2025-12-04 17:55:33,991 - INFO - Finalizing edge weights...
+2025-12-04 17:55:33,991 - INFO - ✅ Optimized graph: 134 nodes, 104 edges
+2025-12-04 17:55:33,991 - INFO -   ✓ Graph Optimization (RAPL) (0.45s)
+2025-12-04 17:55:33,991 - INFO -   ▶ Updating Neo4j
+2025-12-04 17:55:34,596 - INFO - ✅ Neo4j edge update complete: 89 succeeded, 15 skipped
+2025-12-04 17:55:34,597 - INFO - ✅ Neo4j update complete:
+   - Updated: 89 edges
+   - Skipped: 15 edges
+   - Failed: 0 edges
+2025-12-04 17:55:34,597 - INFO -   ✓ Updating Neo4j (0.61s)
+2025-12-04 17:55:34,597 - INFO - 🔍 Building retrieval store...
+2025-12-04 17:55:34,597 - INFO - 🔍 Building retrieval embeddings...
+2025-12-04 17:55:35,309 - INFO - ✅ Retrieval embedding generation complete: 6 succeeded, 0 skipped
+2025-12-04 17:55:35,309 - INFO - ✅ Built retrieval store: 6 docs
+2025-12-04 17:55:35,309 - INFO - ✓ Dual-Index Building (33.97s)
+2025-12-11 22:08:22,549 - INFO - Crystal Cluster beta initialized
+2025-12-11 22:08:22,550 - INFO - Self-RAG: enabled
+2025-12-11 22:08:22,550 - INFO - Config: {'entity_linking_threshold': 0.88, 'retrieval_chunk_size': 320, 'retrieval_chunk_overlap': 120, 'graph_chunk_size': 512, 'graph_chunk_overlap': 50, 'relation_compat_threshold': 0.11, 'final_weight_cutoff': 0.035, 'max_triplets_per_chunk': 15, 'llm_model': 'gpt-4o-mini', 'llm_timeout': 120.0, 'enable_self_rag': True, 'self_rag_confidence_threshold': 0.75, 'self_rag_critic_model': 'gpt-4o-mini', 'self_rag_refiner_model': 'gpt-4o', 'self_rag_max_retries': 1, 'self_rag_token_budget': 100000, 'self_rag_validation_checks': ['entity_quality', 'relation_clarity', 'grammar', 'redundancy'], 'multihop_beam_width': 2, 'multihop_max_paths': 50, 'rapl_max_entities': 100, 'rapl_min_shared_triples': 3, 'neo4j_batch_size': 1000, 'enable_triplet_filter': True, 'triplet_quality_threshold': 0.3}
+2025-12-11 22:14:32,423 - INFO - Crystal Cluster beta initialized
+2025-12-11 22:14:32,423 - INFO - Self-RAG: enabled
+2025-12-11 22:14:32,423 - INFO - Config: {'entity_linking_threshold': 0.88, 'retrieval_chunk_size': 320, 'retrieval_chunk_overlap': 120, 'graph_chunk_size': 512, 'graph_chunk_overlap': 50, 'relation_compat_threshold': 0.11, 'final_weight_cutoff': 0.035, 'max_triplets_per_chunk': 15, 'llm_model': 'gpt-4o-mini', 'llm_timeout': 120.0, 'enable_self_rag': True, 'self_rag_confidence_threshold': 0.75, 'self_rag_critic_model': 'gpt-4o-mini', 'self_rag_refiner_model': 'gpt-4o', 'self_rag_max_retries': 1, 'self_rag_token_budget': 100000, 'self_rag_validation_checks': ['entity_quality', 'relation_clarity', 'grammar', 'redundancy'], 'multihop_beam_width': 2, 'multihop_max_paths': 50, 'rapl_max_entities': 100, 'rapl_min_shared_triples': 3, 'neo4j_batch_size': 1000, 'enable_triplet_filter': True, 'triplet_quality_threshold': 0.3}
+2025-12-11 22:19:01,671 - INFO - Crystal Cluster beta initialized
+2025-12-11 22:19:01,671 - INFO - Self-RAG: enabled
+2025-12-11 22:19:01,671 - INFO - Config: {'entity_linking_threshold': 0.88, 'retrieval_chunk_size': 320, 'retrieval_chunk_overlap': 120, 'graph_chunk_size': 512, 'graph_chunk_overlap': 50, 'relation_compat_threshold': 0.11, 'final_weight_cutoff': 0.035, 'max_triplets_per_chunk': 15, 'llm_model': 'gpt-4o-mini', 'llm_timeout': 120.0, 'enable_self_rag': True, 'self_rag_confidence_threshold': 0.75, 'self_rag_critic_model': 'gpt-4o-mini', 'self_rag_refiner_model': 'gpt-4o', 'self_rag_max_retries': 1, 'self_rag_token_budget': 100000, 'self_rag_validation_checks': ['entity_quality', 'relation_clarity', 'grammar', 'redundancy'], 'multihop_beam_width': 2, 'multihop_max_paths': 50, 'rapl_max_entities': 100, 'rapl_min_shared_triples': 3, 'neo4j_batch_size': 1000, 'enable_triplet_filter': True, 'triplet_quality_threshold': 0.3}
+2025-12-11 22:51:20,691 - INFO - Crystal Cluster beta initialized
+2025-12-11 22:51:20,691 - INFO - Self-RAG: disabled
+2025-12-11 22:51:20,692 - INFO - Config: {'entity_linking_threshold': 0.88, 'retrieval_chunk_size': 320, 'retrieval_chunk_overlap': 120, 'graph_chunk_size': 512, 'graph_chunk_overlap': 50, 'relation_compat_threshold': 0.11, 'final_weight_cutoff': 0.035, 'max_triplets_per_chunk': 5, 'llm_model': 'gpt-4o-mini', 'llm_timeout': 120.0, 'enable_self_rag': False, 'self_rag_confidence_threshold': 0.75, 'self_rag_critic_model': 'gpt-4o-mini', 'self_rag_refiner_model': 'gpt-4o', 'self_rag_max_retries': 1, 'self_rag_token_budget': 100000, 'self_rag_validation_checks': ['entity_quality', 'relation_clarity', 'grammar', 'redundancy'], 'multihop_beam_width': 2, 'multihop_max_paths': 50, 'rapl_max_entities': 100, 'rapl_min_shared_triples': 3, 'neo4j_batch_size': 1000, 'enable_triplet_filter': True, 'triplet_quality_threshold': 0.3}
+2025-12-11 22:51:20,692 - INFO - 🔍 Checking for content duplicates...
+2025-12-11 22:51:20,692 - INFO - 📂 Loaded 3 documents (3 from JSON, 0 raw texts)

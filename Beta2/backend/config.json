@@ -1,0 +1,25 @@
+{
+  "neo4j": {
+    "url": "bolt://localhost:7687",
+    "user": "neo4j",
+    "password": "",
+    "database": "neo4j"
+  },
+  "ai": {
+    "mode": "api",
+    "api_key": "",
+    "model": "gpt-4o-mini",
+    "local_models": [],
+    "figure_model": "granite"
+  },
+  "processing": {
+    "input_dir": "",
+    "output_dir": ""
+  },
+  "advanced": {
+    "graph_chunk_size": 512,
+    "retrieval_chunk_size": 320,
+    "self_rag_enabled": true,
+    "self_rag_threshold": 0.75
+  }
+}

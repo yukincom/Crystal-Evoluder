@@ -1,0 +1,53 @@
+{
+  "neo4j": {
+    "url": "bolt://localhost:7687",
+    "username": "neo4j",
+    "password": "",
+    "database": "neo4j"
+  },
+  "api_keys": {
+    "openai": "",
+    "anthropic": ""
+  },
+  "ai": {
+    "mode": "api",
+    "ollama_url": "http://localhost:11434",
+    "llm_model": "gpt-4o-mini",
+    "vision_model": "granite3.2-vision",
+    "llm_timeout": 120.0
+  },
+  "parameters": {
+    "entity_linking_threshold": 0.88,
+    "retrieval_chunk_size": 320,
+    "retrieval_chunk_overlap": 120,
+    "graph_chunk_size": 512,
+    "graph_chunk_overlap": 50,
+    "relation_compat_threshold": 0.11,
+    "final_weight_cutoff": 0.035,
+    "max_triplets_per_chunk": 15
+  },
+  "self_rag": {
+    "enable": true,
+    "confidence_threshold": 0.75,
+    "critic_model": "gpt-4o-mini",
+    "refiner_model": "gpt-4o-mini",
+    "max_retries": 1,
+    "token_budget": 100000
+  },
+  "figure_analysis": {
+    "enable": true,
+    "dpi": 200,
+    "use_cache": true
+  },
+  "processing": {
+    "enable_duplicate_check": true,
+    "enable_provenance": true,
+    "log_level": "INFO",
+    "max_workers": 4
+  },
+  "geode": {
+    "input_dir": "",
+    "output_dir": "./output",
+    "patterns": ["*.pdf", "*.md", "*.docx"]
+  }
+}
