@@ -1,0 +1,70 @@
+.app {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+}
+
+.ai-mode-switcher, .file-upload {
+  padding: 1.5rem;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: white;
+}
+
+.button-group {
+  display: flex;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+button {
+  padding: 0.75rem 1.5rem;
+  border: 2px solid #007bff;
+  background: white;
+  color: #007bff;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+button:hover:not(:disabled) {
+  background: #007bff;
+  color: white;
+}
+
+button.active {
+  background: #007bff;
+  color: white;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.status-panel {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: #f8f9fa;
+  border-radius: 4px;
+}
+
+details {
+  margin-top: 0.5rem;
+}
+
+details ul {
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+}

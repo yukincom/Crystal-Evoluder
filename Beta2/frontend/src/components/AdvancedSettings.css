@@ -1,0 +1,84 @@
+.advanced-settings {
+  padding: 20px;
+}
+
+.advanced-settings h2 {
+  margin-bottom: 30px;
+  color: #333;
+}
+
+.settings-section {
+  margin-bottom: 30px;
+  padding: 20px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #f9f9f9;
+}
+
+.settings-section h3 {
+  margin-bottom: 15px;
+  color: #555;
+}
+
+.form-group {
+  margin-bottom: 15px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: bold;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.checkbox-group {
+  margin-bottom: 15px;
+}
+
+.checkbox-group label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.checkbox-group input[type="checkbox"] {
+  margin: 0;
+}
+
+.form-group input:disabled {
+  background-color: #e9ecef;
+  opacity: 0.6;
+}
+
+.actions {
+  text-align: center;
+  margin-top: 30px;
+}
+
+.actions button {
+  padding: 12px 24px;
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.actions button:hover {
+  background: #0056b3;
+}
+
+.actions button:disabled {
+  background: #6c757d;
+  cursor: not-allowed;
+}
