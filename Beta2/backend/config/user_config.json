@@ -5,16 +5,17 @@
     "password": "",
     "database": "neo4j"
   },
-  "api_keys": {
-    "openai": "",
-    "anthropic": ""
-  },
   "ai": {
     "mode": "api",
     "ollama_url": "http://localhost:11434",
+    "api_key": "",
     "llm_model": "gpt-4o-mini",
     "vision_model": "granite3.2-vision",
-    "llm_timeout": 120.0
+    
+    "refiner_mode": null,
+    "refiner_ollama_url": null,
+    "refiner_api_key": null,
+    "refiner_model": null
   },
   "parameters": {
     "entity_linking_threshold": 0.88,
@@ -29,25 +30,32 @@
   "self_rag": {
     "enable": true,
     "confidence_threshold": 0.75,
-    "critic_model": "gpt-4o-mini",
-    "refiner_model": "gpt-4o-mini",
     "max_retries": 1,
     "token_budget": 100000
   },
-  "figure_analysis": {
-    "enable": true,
-    "dpi": 200,
-    "use_cache": true
-  },
   "processing": {
-    "enable_duplicate_check": true,
-    "enable_provenance": true,
-    "log_level": "INFO",
-    "max_workers": 4
-  },
-  "geode": {
     "input_dir": "",
     "output_dir": "./output",
     "patterns": ["*.pdf", "*.md", "*.docx"]
+  },
+  "advanced": {
+    "graph_chunk_size": 512,
+    "graph_chunk_overlap": 50,
+    "retrieval_chunk_size": 320,
+    "retrieval_chunk_overlap": 120,
+    "entity_linking_threshold": 0.88,
+    "relation_compat_threshold": 0.11,
+    "final_weight_cutoff": 0.035,
+    "max_triplets_per_chunk": 15,
+    "self_rag_enabled": true,
+    "self_rag_threshold": 0.75,
+    "self_rag_critic_model": "gpt-4o-mini",
+    "self_rag_critic_mode": "api",
+    "self_rag_refiner_model": "gpt-4o-mini",
+    "self_rag_refiner_mode": "api",
+    "self_rag_refiner_ollama_url": null,
+    "self_rag_refiner_api_key": null,
+    "self_rag_max_retries": 1,
+    "self_rag_token_budget": 100000
   }
 }
