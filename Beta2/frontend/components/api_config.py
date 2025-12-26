@@ -11,7 +11,6 @@ from utils.validators import (
     validate_ollama_connection
 )
 
-
 def render_api_config():
     """APIキー設定UIを描画（改善版）"""
 
