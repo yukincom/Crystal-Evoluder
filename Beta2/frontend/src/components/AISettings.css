@@ -86,7 +86,7 @@ small {
 
 .settings-section button {
   padding: 10px 20px;
-  background: #28a745;
+  background: #006eff;
   color: white;
   border: none;
   border-radius: 4px;
@@ -110,7 +110,7 @@ small {
 
 .actions button {
   padding: 12px 24px;
-  background: #007bff;
+  background: #00a2ff;
   color: white;
   border: none;
   border-radius: 4px;
@@ -125,4 +125,36 @@ small {
 .actions button:disabled {
   background: #6c757d;
   cursor: not-allowed;
+}
+.test-button-row {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #eee;
+}
+
+.btn-secondary {
+  background: #6c757d;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #5a6268;
+}
+
+.btn-secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.success-box {
+  padding: 12px 24px;
+  background: #d4edda;
+  border-left: 4px solid #28a745;
+  border-radius: 4px;
+  margin: 0.5rem 0;
+  color: #155724;
 }

@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { getConfig, saveConfig, testNeo4jConnection } from '../api/client';
 import type { Config } from '../types';
 import './BasicSettings.css';
-
 export const BasicSettings: React.FC = () => {
   const [config, setConfig] = useState<Config | null>(null);
   const [loading, setLoading] = useState(false);
@@ -81,10 +80,10 @@ export const BasicSettings: React.FC = () => {
 
   return (
     <div className="basic-settings">
-      <h2>基本設定</h2>
+      <h2> GraphRAG 設定</h2>
 
       <div className="settings-section">
-        <h3>Neo4j接続</h3>
+        <h3>Neo4j 設定</h3>
         <div className="form-group">
           <label>URL:</label>
           <input
@@ -95,11 +94,11 @@ export const BasicSettings: React.FC = () => {
           />
         </div>
         <div className="form-group">
-          <label>User:</label>
+          <label>UserName:</label>
           <input
             type="text"
-            value={config.neo4j.user}
-            onChange={(e) => handleInputChange('neo4j', 'user', e.target.value)}
+            value={config.neo4j.username}
+            onChange={(e) => handleInputChange('neo4j', 'username', e.target.value)}
             placeholder="neo4j"
           />
         </div>
@@ -127,28 +126,28 @@ export const BasicSettings: React.FC = () => {
       </div>
 
       <div className="settings-section">
-        <h3>処理対象</h3>
+        <h3>GraphRAG 構築対象データ</h3>
         <div className="form-group">
-          <label>入力フォルダ:</label>
+          <label>元データフォルダ:</label>
           <div className="input-with-button">
             <input
               type="text"
               value={config.processing.input_dir}
               onChange={(e) => handleInputChange('processing', 'input_dir', e.target.value)}
-              placeholder="入力フォルダを選択"
+              placeholder="フォルダを選択"
               readOnly
             />
             <button onClick={() => handleDirSelect('input_dir')}>選択</button>
           </div>
         </div>
         <div className="form-group">
-          <label>出力フォルダ:</label>
+          <label>構築結果フォルダ:</label>
           <div className="input-with-button">
             <input
               type="text"
               value={config.processing.output_dir}
               onChange={(e) => handleInputChange('processing', 'output_dir', e.target.value)}
-              placeholder="出力フォルダを選択"
+              placeholder="結果フォルダを選択"
               readOnly
             />
             <button onClick={() => handleDirSelect('output_dir')}>選択</button>
