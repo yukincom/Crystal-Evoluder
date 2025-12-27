@@ -6,12 +6,13 @@
     "database": "neo4j"
   },
   "ai": {
-    "mode": "api",
+    "mode": "ollama",
     "ollama_url": "http://localhost:11434",
+    "api_model": "gpt-4o-mini",
+    "ollama_model": "",
+    "llm_model": "",
     "api_key": "",
-    "llm_model": "gpt-4o-mini",
-    "vision_model": "granite3.2-vision",
-    
+    "vision_model": "",
     "refiner_mode": null,
     "refiner_ollama_url": null,
     "refiner_api_key": null,
@@ -36,7 +37,11 @@
   "processing": {
     "input_dir": "",
     "output_dir": "./output",
-    "patterns": ["*.pdf", "*.md", "*.docx"]
+    "patterns": [
+      "*.pdf",
+      "*.md",
+      "*.docx"
+    ]
   },
   "advanced": {
     "graph_chunk_size": 512,
@@ -53,8 +58,8 @@
     "self_rag_critic_mode": "api",
     "self_rag_refiner_model": "gpt-4o-mini",
     "self_rag_refiner_mode": "api",
-    "self_rag_refiner_ollama_url": null,
-    "self_rag_refiner_api_key": null,
+    "self_rag_refiner_ollama_url": "http://localhost:11434",
+    "self_rag_refiner_api_key": "",
     "self_rag_max_retries": 1,
     "self_rag_token_budget": 100000
   }
