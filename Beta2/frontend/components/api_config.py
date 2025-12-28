@@ -14,7 +14,7 @@ from utils.validators import (
 def render_api_config():
     """APIキー設定UIを描画（改善版）"""
 
-    st.subheader("🤖 AI設定")
+    st.subheader("AI設定")
 
     config_mgr = get_config_manager()
 
@@ -38,7 +38,7 @@ def render_api_config():
             "AI動作モード",
             options=['local', 'api'],
             format_func=lambda x: {
-                'local': '🖥️ Local AI',
+                'local': '🏠 Local AI',
                 'api': '🌐 API'
             }[x],
             index=0 if current_mode == 'ollama' and has_local else 1,
@@ -76,7 +76,7 @@ def render_api_config():
     col1, col2 = st.columns([3, 1])
 
     with col1:
-        if st.button("💾 設定を保存", use_container_width=True, type="primary"):
+        if st.button(" 設定を保存", use_container_width=True, type="primary"):
             if config_mgr.save_config():
                 st.success("✅ AI設定を保存しました")
             else:
@@ -153,7 +153,7 @@ def _render_local_model_selector(config_mgr, available_models):
         ```
         """)
         # APIモードへの切り替えを提案
-        st.info("💡 APIモードに切り替えることをお勧めします")
+        st.info("APIモードに切り替えることをお勧めします")
         return
 
     # 能力別に分類
@@ -224,7 +224,7 @@ def _render_api_model_selector(config_mgr):
         "LLMモデル",
         value=current_model,
         placeholder="gpt-4o-mini",
-        help="💡 GPT-4o-mini以上を推奨",
+        help=" GPT-4o-mini以上を推奨",
         key="api_llm_model"
     )
 
@@ -299,7 +299,7 @@ def _render_api_key_input(config_mgr):
 def _render_vision_model_selector(config_mgr, mode, available_models):
     """図表解析モデル選択UI"""
 
-    st.markdown("### 図表解析")
+    st.markdown("### 🖼️ 図表解析")
 
     if mode == 'local':
         vision_models = available_models['vision']
