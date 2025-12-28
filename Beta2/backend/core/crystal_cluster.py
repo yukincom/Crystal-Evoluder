@@ -71,6 +71,20 @@ class CrystalCluster:
                 'mode': 'api',  # 'api' or 'ollama'
                 'ollama_url': 'http://localhost:11434',
                 'api_key': None  # 環境変数から取得も可
+            },            
+            # 処理設定
+            'processing': {
+                'enable_duplicate_check': True,
+                'enable_provenance': True,
+                'log_level': 'INFO',
+                'max_workers': 4,
+            },
+
+            # Geode設定
+            'geode': {
+                'input_dir': '',
+                'output_dir': './output',
+                'patterns': ['*.pdf', '*.md', '*.docx'],
             }
         }
 
@@ -82,14 +96,22 @@ class CrystalCluster:
 
         # 🔧 フェイルセーフ: Noneのままなら基本モデルに追従
         if self.config['self_rag_critic_model'] is None:
-            self.config['self_rag_critic_model'] = self.config['llm_model']
-            self.logger.info(f"Critic model set to base model: {self.config['llm_model']}")
-       
-        # 🔧 追加: refiner_modelが未設定なら基本モデルに追従（またはワンランク上）
+            base_model = self.config.get('api_model') if self.config.get('mode') == 'api' else self.config.get('ollama_model')
+            if not base_model:
+                base_model = self.config.get('llm_model', 'gpt-4o-mini') 
+    
+            self.config['self_rag_critic_model'] = base_model
+            self.logger.info(f"Critic model set to: {base_model}")
+
+        # refiner_modelが未設定なら基本モデルに追従（またはワンランク上）
         if self.config['self_rag_refiner_model'] is None:
+            base_model = self.config.get('api_model') if self.config.get('mode') == 'api' else self.config.get('ollama_model')
+            if not base_model:
+                base_model = self.config.get('llm_model', 'gpt-4o-mini')
+
             # デフォルトでは基本モデルと同じ（必要に応じて上位モデルを指定）
-            self.config['self_rag_refiner_model'] = self.config['llm_model']
-            self.logger.info(f"Refiner model set to base model: {self.config['llm_model']}")
+            self.config['self_rag_refiner_model'] = base_model
+            self.logger.info(f"Refiner model set to: {base_model}")
 
         self.config.setdefault('enable_triplet_filter', True)
         self.config.setdefault('triplet_quality_threshold', 0.3)
@@ -105,7 +127,17 @@ class CrystalCluster:
         self.embed_model = ensure_bge_m3()
 
         # AI Router初期化
-        self.ai_router = AIRouter(config=self.config, logger=self.logger)
+        self.ai_router = AIRouter(config={
+            'api_model': self.config.get('api_model', 'gpt-4o-mini'),
+            'ollama_model': self.config.get('ollama_model', ''),
+            'self_rag_critic_model': self.config.get('self_rag_critic_model'),
+            'self_rag_refiner_model': self.config.get('self_rag_refiner_model'),
+            'ai_routing': {
+                'mode': self.config.get('mode', 'api'),
+                'ollama_url': self.config.get('ollama_url', 'http://localhost:11434'),
+                'api_key': self.config.get('api_key')
+            }
+        }, logger=self.logger)
 
         # 各コンポーネントの初期化
         self.document_processor = DocumentProcessor(self.logger)
