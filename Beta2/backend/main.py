@@ -30,18 +30,26 @@ class Neo4jConfig(BaseModel):
     password: str = ""
     database: str = "neo4j"
 
+
 class AIConfig(BaseModel):
     mode: str = "api"  # "api" or "ollama"
     ollama_url: str = "http://localhost:11434"
+    
+    # モード別のモデル名（独立管理）
+    api_model: str = "gpt-4o-mini"
+    ollama_model: str = ""
+    
+    # 後方互換性のため残す（非推奨）
+    llm_model: Optional[str] = None
+    
     api_key: str = ""
-    llm_model: str = "gpt-4o-mini"
     vision_model: str = "granite3.2-vision"
-
+    
     # Refiner専用のオーバーライド設定
-    refiner_mode: Optional[str] = None        # Noneならmodeに追従
-    refiner_ollama_url: Optional[str] = None  # Noneならollama_urlに追従
-    refiner_api_key: Optional[str] = None     # Noneならapi_keyに追従
-    refiner_model: Optional[str] = None       # Noneならllm_modelに追従
+    refiner_mode: Optional[str] = None
+    refiner_ollama_url: Optional[str] = None
+    refiner_api_key: Optional[str] = None
+    refiner_model: Optional[str] = None
 
 class ParametersConfig(BaseModel):
     entity_linking_threshold: float = 0.88
@@ -128,15 +136,48 @@ def load_config() -> FullConfig:
             advanced=AdvancedConfig()
         )
 
+    # Ollamaモデルの自動検出と検証
+    if config.ai.mode == 'ollama':
+        try:
+            response = requests.get(
+                f"{config.ai.ollama_url}/api/tags",
+                timeout=3
+            )
+            
+            if response.status_code == 200:
+                models_data = response.json().get('models', [])
+                llm_models = []
+                
+                for model in models_data:
+                    name = model.get('name', '')
+                    # Visionモデルを除外
+                    if not any(kw in name.lower() for kw in ['vision', 'llava', 'granite']):
+                        llm_models.append(name)
+                
+                # ollama_modelが未設定または無効な場合、自動設定
+                if not config.ai.ollama_model or config.ai.ollama_model not in llm_models:
+                    if llm_models:
+                        config.ai.ollama_model = llm_models[0]  # 最初のモデルを使用
+                        print(f"✅ Ollama model auto-detected: {config.ai.ollama_model}")
+                    else:
+                        print("⚠️ No Ollama LLM models found")
+                        config.ai.ollama_model = ""
+                
+        except Exception as e:
+            print(f"⚠️ Could not connect to Ollama: {e}")
+            config.ai.ollama_model = ""
+
     # --- フロント用のAdvancedConfigを最新状態に同期 ---
     adv = config.advanced
+    # 追加: 基本モデルを取得
+    base_model = config.ai.api_model if config.ai.mode == 'api' else config.ai.ollama_model
     
     # Critic：常にメインに追従（編集不可）
-    adv.self_rag_critic_model = config.ai.llm_model
+    adv.self_rag_critic_model = base_model
     adv.self_rag_critic_mode = config.ai.mode
     
     # Refiner：オーバーライドがあればそれ優先、なければメインに追従
-    adv.self_rag_refiner_model = config.ai.refiner_model or config.ai.llm_model
+    adv.self_rag_refiner_model = config.ai.refiner_model or base_model
     adv.self_rag_refiner_mode = config.ai.refiner_mode or config.ai.mode
     adv.self_rag_refiner_ollama_url = config.ai.refiner_ollama_url or config.ai.ollama_url
     adv.self_rag_refiner_api_key = config.ai.refiner_api_key or config.ai.api_key
@@ -334,7 +375,8 @@ async def test_ai_connection(ai_config: dict):
             mode: 'api' | 'ollama',
             api_key: str (API mode時),
             llm_model: str,
-            ollama_url: str (Ollama mode時)
+            ollama_url: str (Ollama mode時),   // Ollama用モデル名を保持
+            llm_model: string 
         }
     
     Returns:
@@ -345,7 +387,7 @@ async def test_ai_connection(ai_config: dict):
     if mode == 'api':
         # APIキーの検証
         api_key = ai_config.get('api_key', '')
-        llm_model = ai_config.get('llm_model', '')
+        llm_model = ai_config.get('api_model', '')
         
         if not api_key:
             raise HTTPException(status_code=400, detail="APIキーが設定されていません")
@@ -372,7 +414,7 @@ async def test_ai_connection(ai_config: dict):
     elif mode == 'ollama':
         # Ollama接続確認
         ollama_url = ai_config.get('ollama_url', 'http://localhost:11434')
-        llm_model = ai_config.get('llm_model', '')
+        llm_model = ai_config.get('ollama_model', '')
         
         try:
             response = requests.get(f"{ollama_url}/api/tags", timeout=5)
@@ -393,11 +435,30 @@ async def test_ai_connection(ai_config: dict):
                     "message": f"❌ モデル '{llm_model}' が見つかりません"
                 }
             
+            # 指定されたモデルの能力チェック
+            if llm_model:
+                target_model = next((m for m in models if m.get('name') == llm_model), None)
+                if target_model:
+                    size_bytes = target_model.get('size', 0)
+                    size_gb = round(size_bytes / (1024 ** 3), 1)
+                    capable = size_gb >= 20  # 70B未満は非推奨
+                    
+                    if not capable:
+                        return {
+                            "success": False,
+                            "message": f"⚠️ モデル '{llm_model}' ({size_gb}GB) は能力不足です。70B以上（20GB以上）のモデルを推奨します。"
+                        }
+                    
+                    return {
+                        "success": True,
+                        "message": f"✅ Ollama接続成功！モデル: {llm_model} ({size_gb}GB)"
+                    }
+            
+            # モデル未指定の場合
             return {
                 "success": True,
-                "message": f"✅ Ollama接続成功！利用可能モデル: {len(models)}個"
+                "message": f"✅ Ollama接続成功！"
             }
-        
         except requests.exceptions.ConnectionError:
             return {
                 "success": False,
@@ -527,6 +588,18 @@ def setup(req: ConfigRequest):
     try:
         # 設定ロード
         config = load_config(req.mode, req.values)
+
+        if config.get('ai_routing', {}).get('mode') == 'api':
+            base_model = config.get('api_model', 'gpt-4o-mini')
+        else:
+            base_model = config.get('ollama_model', '')
+
+        if not config.get('self_rag_critic_model'):
+            config['self_rag_critic_model'] = base_model
+        
+        # Refinerが未設定なら基本モデルに追従
+        if not config.get('self_rag_refiner_model'):
+            config['self_rag_refiner_model'] = base_model
 
         # CrystalCluster初期化
         cluster_instance = CrystalCluster(custom_config=config)

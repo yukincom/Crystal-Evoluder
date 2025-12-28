@@ -6,11 +6,12 @@
     "database": "neo4j"
   },
   "ai": {
-    "mode": "api",
+    "mode": "ollama",
     "ollama_url": "http://localhost:11434",
     "api_key": "",
-    "llm_model": "gpt-4o-mini",
-    "vision_model": "granite3.2-vision",
+    "api_model": "gpt-4o-mini",
+    "ollama_model": "",                    
+    "vision_model": "granite3.2-vision",   
     
     "refiner_mode": null,
     "refiner_ollama_url": null,
