@@ -48,8 +48,8 @@ class CrystalCluster:
             # Self-RAG設定
             'enable_self_rag': True,                    # Self-RAGを有効化
             'self_rag_confidence_threshold': 0.75,       # 再生成の閾値
-            'self_rag_critic_model': 'gpt-4o-mini',     # 評価用LLM
-            'self_rag_refiner_model': 'gpt-5-mini',         # 再生成用LLM（より高性能）
+            'self_rag_critic_model': None,     # 評価用LLM
+            'self_rag_refiner_model': None,         # 再生成用LLM（より高性能）
             'self_rag_max_retries': 1,                  # 最大再試行回数
             'self_rag_token_budget': 100000,            # トークン予算
             'self_rag_validation_checks': [             # 検証項目
@@ -79,6 +79,18 @@ class CrystalCluster:
             default_config.update(custom_config)
 
         self.config = default_config
+
+        # 🔧 フェイルセーフ: Noneのままなら基本モデルに追従
+        if self.config['self_rag_critic_model'] is None:
+            self.config['self_rag_critic_model'] = self.config['llm_model']
+            self.logger.info(f"Critic model set to base model: {self.config['llm_model']}")
+       
+        # 🔧 追加: refiner_modelが未設定なら基本モデルに追従（またはワンランク上）
+        if self.config['self_rag_refiner_model'] is None:
+            # デフォルトでは基本モデルと同じ（必要に応じて上位モデルを指定）
+            self.config['self_rag_refiner_model'] = self.config['llm_model']
+            self.logger.info(f"Refiner model set to base model: {self.config['llm_model']}")
+
         self.config.setdefault('enable_triplet_filter', True)
         self.config.setdefault('triplet_quality_threshold', 0.3)
 
