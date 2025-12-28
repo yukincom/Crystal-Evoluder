@@ -17,6 +17,24 @@ class TripletFilter:
         self.logger = logger
         self.total_self_rag_tokens = 0
 
+        # 🔧 追加: 基本モデル設定を取得
+        self.mode = config.get('mode', 'api')
+    
+        # モードに応じた基本モデルを取得
+        if self.mode == 'api':
+            self.base_model = config.get('api_model', 'gpt-4o-mini')
+        else:
+            self.base_model = config.get('ollama_model', '')
+    
+        # Self-RAG用モデル
+        self.critic_model = config.get('self_rag_critic_model') or self.base_model
+        self.refiner_model = config.get('self_rag_refiner_model') or self.base_model
+    
+        self.logger.info(f"TripletFilter initialized:")
+        self.logger.info(f"  Base model: {self.base_model}")
+        self.logger.info(f"  Critic model: {self.critic_model}")
+        self.logger.info(f"  Refiner model: {self.refiner_model}")
+
         # 関係タイプのブラックリスト
         self.relation_blacklist = {
             'is', 'has', 'are', 'was', 'were',
@@ -79,7 +97,7 @@ class TripletFilter:
         self,
         triplets: List[Tuple[str, str, str]],
         chunk_text: str,
-        llm: Any = None
+        ai_router
     ) -> Tuple[List[Tuple], Dict]:
         """
         Self-RAG: トリプレットを評価し、低品質なものを再生成
@@ -145,7 +163,7 @@ class TripletFilter:
                 refined, tokens_used = self._refiner_regenerate_triplet(
                     triplet_info['triplet'],
                     chunk_text,
-                    llm
+                    ai_router
                 )
 
                 refinement_stats['attempted'] += 1
@@ -370,7 +388,7 @@ class TripletFilter:
         self,
         original_triplet: Tuple[str, str, str],
         chunk_text: str,
-        llm: Any = None
+        ai_router: Any = None
     ) -> Tuple[Optional[Tuple[str, str, str]], int]:
         """
         低品質トリプレットを再生成
@@ -378,7 +396,7 @@ class TripletFilter:
         Args:
             original_triplet: 元のトリプレット
             chunk_text: 元のテキスト
-            llm: LLMインスタンス
+            ai_router: AIRouterインスタンス
 
         Returns:
             改善されたトリプレット（失敗時はNone）
@@ -386,11 +404,8 @@ class TripletFilter:
         s, r, o = original_triplet
 
         # LLMが提供されていない場合は初期化
-        if llm is None:
-            llm = OpenAI(
-                model=self.config['self_rag_refiner_model'],
-                timeout=self.config['llm_timeout']
-            )
+        if ai_router is None:
+            raise ValueError("AIRouter instance is required")
 
         # ============================================================
         # プロンプト構築
