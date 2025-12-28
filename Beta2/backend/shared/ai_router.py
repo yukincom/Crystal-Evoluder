@@ -14,7 +14,8 @@ class TaskType(Enum):
     """タスクタイプ"""
     TRIPLET_EXTRACTION = "triplet_extraction"
     QUALITY_CHECK = "quality_check"
-    SELF_RAG = "self_rag"
+    SELF_RAG_CRITIC = "self_rag_critic"
+    SELF_RAG_REFINER = "self_rag_refiner"
     GENERAL = "general"
 
 class AIRouter:
@@ -24,29 +25,40 @@ class AIRouter:
         self.config = config or {}
         self.logger = logger or setup_logger('AIRouter')
 
-        # デフォルト設定
+        # 🔧 修正: 基本モデル設定を取得
+        self.mode = self.config.get('ai_routing', {}).get('mode', 'api')
+        self.base_api_model = self.config.get('api_model', 'gpt-4o-mini')
+        self.base_ollama_model = self.config.get('ollama_model', '')
+
+        # デフォルト設定（基本モデルを使用）
         self.task_defaults = {
             TaskType.TRIPLET_EXTRACTION: {
-                'api_model': 'gpt-4o-mini',
-                'ollama_model': 'llama3.1:70b',
+                'api_model': self.base_api_model,
+                'ollama_model': self.base_ollama_model,
                 'temperature': 0.3,
                 'max_tokens': 1024
             },
             TaskType.QUALITY_CHECK: {
-                'api_model': 'gpt-4o-mini',
-                'ollama_model': 'qwen2.5:32b',
+                'api_model': self.base_api_model,
+                'ollama_model': self.base_ollama_model,
                 'temperature': 0.1,
                 'max_tokens': 512
             },
-            TaskType.SELF_RAG: {
-                'api_model': 'gpt-4o-mini',
-                'ollama_model': 'llama3.1:70b',
+            TaskType.SELF_RAG_CRITIC: {
+                'api_model': self.config.get('self_rag_critic_model', self.base_api_model),
+                'ollama_model': self.config.get('self_rag_critic_model', self.base_ollama_model),
+                'temperature': 0.2,
+                'max_tokens': 512
+            },
+            TaskType.SELF_RAG_REFINER: {
+                'api_model': self.config.get('self_rag_refiner_model', self.base_api_model),
+                'ollama_model': self.config.get('self_rag_refiner_model', self.base_ollama_model),
                 'temperature': 0.7,
                 'max_tokens': 2048
             },
             TaskType.GENERAL: {
-                'api_model': 'gpt-4o-mini',
-                'ollama_model': 'llama3.1:8b',
+                'api_model': self.base_api_model,
+                'ollama_model': self.base_ollama_model,
                 'temperature': 0.5,
                 'max_tokens': 1024
             }
@@ -60,7 +72,6 @@ class AIRouter:
         })
 
         # モード設定
-        self.mode = self.ai_routing.get('mode', 'api')
         self.ollama_url = self.ai_routing.get('ollama_url', 'http://localhost:11434')
         self.api_key = self.ai_routing.get('api_key') or os.environ.get('OPENAI_API_KEY')
 
@@ -73,6 +84,9 @@ class AIRouter:
             self.openai_client = OpenAI(api_key=self.api_key)
 
         self.logger.info(f"✅ AI Router initialized (mode: {self.mode})")
+        self.logger.info(f"   Base API model: {self.base_api_model}")
+        self.logger.info(f"   Base Ollama model: {self.base_ollama_model or '(not set)'}")
+        
         if self.ollama_available:
             self.logger.info("✅ Ollama available")
         else:
@@ -104,6 +118,11 @@ class AIRouter:
 
         # タスク設定取得
         task_config = self.task_defaults.get(task, self.task_defaults[TaskType.GENERAL])
+
+        # 🔧 修正: Self-RAG Criticは常に基本モデルを使用
+        if task == TaskType.SELF_RAG_CRITIC:
+            task_config['api_model'] = self.base_api_model
+            task_config['ollama_model'] = self.base_ollama_model
 
         # モード決定
         if self.mode == 'ollama' and self.ollama_available:
@@ -139,6 +158,13 @@ class AIRouter:
     def _call_ollama(self, task_config: Dict, prompt: str, system_prompt: str, **kwargs) -> str:
         """Ollama呼び出し"""
         model = kwargs.get('model', task_config['ollama_model'])
+        
+        # 🔧 追加: モデルが空の場合はエラー
+        if not model:
+            raise ValueError(
+                f"Ollama model not configured. Please set 'ollama_model' in config."
+            )
+        
         temperature = kwargs.get('temperature', task_config['temperature'])
 
         # Ollama API 形式
@@ -198,9 +224,14 @@ class AIRouter:
             'ollama_available': self.ollama_available,
             'ollama_url': self.ollama_url,
             'api_configured': bool(self.api_key),
-            'models': {
+            'base_models': {
+                'api': self.base_api_model,
+                'ollama': self.base_ollama_model or '(not set)'
+            },
+            'task_models': {
                 'triplet_extraction': self.task_defaults[TaskType.TRIPLET_EXTRACTION]['ollama_model'] if self.mode == 'ollama' else self.task_defaults[TaskType.TRIPLET_EXTRACTION]['api_model'],
                 'quality_check': self.task_defaults[TaskType.QUALITY_CHECK]['ollama_model'] if self.mode == 'ollama' else self.task_defaults[TaskType.QUALITY_CHECK]['api_model'],
-                'self_rag': self.task_defaults[TaskType.SELF_RAG]['ollama_model'] if self.mode == 'ollama' else self.task_defaults[TaskType.SELF_RAG]['api_model']
+                'self_rag_critic': self.task_defaults[TaskType.SELF_RAG_CRITIC]['ollama_model'] if self.mode == 'ollama' else self.task_defaults[TaskType.SELF_RAG_CRITIC]['api_model'],
+                'self_rag_refiner': self.task_defaults[TaskType.SELF_RAG_REFINER]['ollama_model'] if self.mode == 'ollama' else self.task_defaults[TaskType.SELF_RAG_REFINER]['api_model']
             }
         }
