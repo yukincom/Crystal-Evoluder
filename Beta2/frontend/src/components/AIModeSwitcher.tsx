@@ -40,7 +40,7 @@ export const AIModeSwitcher: React.FC = () => {
           disabled={loading || status.mode === 'api'}
           className={status.mode === 'api' ? 'active' : ''}
         >
-          ☁️ API Mode
+          🌐 API Mode
         </button>
 
         <button
@@ -48,7 +48,7 @@ export const AIModeSwitcher: React.FC = () => {
           disabled={loading || status.mode === 'ollama' || !status.ollama_available}
           className={status.mode === 'ollama' ? 'active' : ''}
         >
-          🖥️ Local Mode (Ollama)
+          🏠 Local Mode (Ollama)
         </button>
       </div>
 
@@ -59,9 +59,10 @@ export const AIModeSwitcher: React.FC = () => {
         <details>
           <summary>Model Details</summary>
           <ul>
-            <li>Triplet: {status.models.triplet_extraction}</li>
-            <li>Quality: {status.models.quality_check}</li>
-            <li>Self-RAG: {status.models.self_rag}</li>
+            <li>Triplet: {status.task_models.triplet_extraction}</li>
+            <li>Quality (Critic): {status.task_models.quality_check}</li>
+            <li>Self-RAG Critic: {status.task_models.self_rag_critic}</li>
+            <li>Self-RAG Refiner: {status.task_models.self_rag_refiner}</li>
           </ul>
         </details>
       </div>
