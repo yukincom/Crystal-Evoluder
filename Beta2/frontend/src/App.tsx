@@ -11,7 +11,7 @@ function App() {
   const tabs = [
     {
       id: 'basic',
-      label: '基本設定',
+      label: 'GraphRAG 設定',
       content: <BasicSettings />
     },
     {
@@ -21,7 +21,7 @@ function App() {
     },
     {
       id: 'ai',
-      label: 'AI設定',
+      label: 'AI 設定',
       content: <AISettings />
     },
     {
@@ -39,7 +39,7 @@ function App() {
   return (
     <div className="app">
       <header>
-        <h1>🔮 Crystal Cluster</h1>
+        <h1>💎 Crystal Cluster</h1>
         <p>Knowledge Graph RAG System</p>
       </header>
 
