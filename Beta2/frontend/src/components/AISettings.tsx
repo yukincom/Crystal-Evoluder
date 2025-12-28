@@ -59,6 +59,7 @@ export const AISettings: React.FC = () => {
               ollama_model: firstValidModel.name
             }
           });
+          console.log('✅ Auto-selected Ollama model:', firstValidModel.name);
         }
       } else {
         // 設定されているモデルが有効か確認
@@ -67,7 +68,7 @@ export const AISettings: React.FC = () => {
         );
         
         if (!validModel) {
-          console.warn('無効なOllamaモデルが設定されています:', currentModel);
+          console.warn('⚠️ 無効なOllamaモデルが設定されています:', currentModel);
           // 有効な最初のモデルに置き換え
           const firstValidModel = llmModels.find(m => m.capable);
           if (firstValidModel) {
@@ -78,6 +79,7 @@ export const AISettings: React.FC = () => {
                 ollama_model: firstValidModel.name
               }
             });
+            console.log('✅ Replaced with valid Ollama model:', firstValidModel.name);
           }
         }
       }
@@ -141,7 +143,15 @@ export const AISettings: React.FC = () => {
     if (!config) return;
     setTestingAI(true);
     try {
-      const result = await testAIConnection(config.ai);
+      const testConfig = {
+        mode: config.ai.mode,
+        api_key: config.ai.api_key,
+        ollama_url: config.ai.ollama_url,
+        api_model: config.ai.api_model,      
+        ollama_model: config.ai.ollama_model, 
+      };
+
+      const result = await testAIConnection(testConfig);
       alert(result.message || '✅ 接続成功！');
     } catch (error: any) {
       alert(`❌ 接続失敗: ${error.message || '不明なエラー'}`);
