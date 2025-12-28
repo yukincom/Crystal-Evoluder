@@ -8,11 +8,11 @@
   "ai": {
     "mode": "ollama",
     "ollama_url": "http://localhost:11434",
-    "api_model": "gpt-4o-mini",
-    "ollama_model": "",
-    "llm_model": "",
     "api_key": "",
-    "vision_model": "",
+    "api_model": "gpt-4o-mini",
+    "ollama_model": "",                    
+    "vision_model": "granite3.2-vision",   
+    
     "refiner_mode": null,
     "refiner_ollama_url": null,
     "refiner_api_key": null,
@@ -37,11 +37,7 @@
   "processing": {
     "input_dir": "",
     "output_dir": "./output",
-    "patterns": [
-      "*.pdf",
-      "*.md",
-      "*.docx"
-    ]
+    "patterns": ["*.pdf", "*.md", "*.docx"]
   },
   "advanced": {
     "graph_chunk_size": 512,
@@ -52,14 +48,17 @@
     "relation_compat_threshold": 0.11,
     "final_weight_cutoff": 0.035,
     "max_triplets_per_chunk": 15,
+    
     "self_rag_enabled": true,
     "self_rag_threshold": 0.75,
-    "self_rag_critic_model": "gpt-4o-mini",
-    "self_rag_critic_mode": "api",
-    "self_rag_refiner_model": "gpt-4o-mini",
-    "self_rag_refiner_mode": "api",
-    "self_rag_refiner_ollama_url": "http://localhost:11434",
-    "self_rag_refiner_api_key": "",
+    
+    "self_rag_critic_model": "",
+    "self_rag_critic_mode": "ollama",
+    "self_rag_refiner_model": "",
+    "self_rag_refiner_mode": "ollama",
+    "self_rag_refiner_ollama_url": null,
+    "self_rag_refiner_api_key": null,
+    
     "self_rag_max_retries": 1,
     "self_rag_token_budget": 100000
   }

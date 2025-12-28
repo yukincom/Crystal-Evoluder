@@ -35,9 +35,18 @@ class ConfigManager:
         'ai': {
             'mode': 'api',  # 'api' or 'ollama'
             'ollama_url': 'http://localhost:11434',
-            'llm_model': 'gpt-4o-mini',
+            'api_key': '',
+            'api_model': 'gpt-4o-mini',      # ← API用モデル
+            'ollama_model': '',               # ← Ollama用モデル（空文字列でOK）
             'vision_model': 'granite3.2-vision',
             'llm_timeout': 120.0,
+    
+            # Refiner設定
+            'refiner_mode': None,
+            'refiner_ollama_url': None,
+            'refiner_api_key': None,
+            'refiner_model': None,
+
         },
 
         # 基本パラメータ
@@ -56,8 +65,8 @@ class ConfigManager:
         'self_rag': {
             'enable': True,
             'confidence_threshold': 0.75,
-            'critic_model': 'gpt-4o-mini',
-            'refiner_model': 'gpt-4o-mini',
+            'critic_model': None,
+            'refiner_model': None,
             'max_retries': 1,
             'token_budget': 100000,
         },
@@ -121,7 +130,7 @@ class ConfigManager:
         else:
             logger.info("No config file found, using defaults")
             return self.DEFAULT_CONFIG.copy()
-
+        
     def save_config(self) -> bool:
         """設定ファイルを保存"""
         try:
