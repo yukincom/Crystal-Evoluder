@@ -11,14 +11,14 @@ from llama_index.core import Document
 from llama_index.graph_stores.neo4j import Neo4jGraphStore
 
 
-from config.config_manager import _load_config
-from shared import setup_logger, HierarchicalLogger
-from shared.ai_router import AIRouter
-from processors import DocumentProcessor, ChunkProcessor
-from builders import GraphBuilder, RetrievalBuilder
-from linkers import EntityLinker
-from filters import TripletFilter
-from rag import MultiHopExplorer
+from ..config.config_manager import _load_config
+from ..shared import setup_logger, HierarchicalLogger
+from ..shared.ai_router import AIRouter
+from ..processors import DocumentProcessor, ChunkProcessor
+from ..builders import GraphBuilder, RetrievalBuilder
+from ..linkers import EntityLinker
+from ..filters import TripletFilter
+from ..rag import MultiHopExplorer
 
 
 class CrystalCluster:
@@ -33,85 +33,28 @@ class CrystalCluster:
         self.hlogger = HierarchicalLogger(self.logger)
         self.use_dual_chunk = use_dual_chunk
 
-        default_config = {
-            'entity_linking_threshold': 0.88,
-            'retrieval_chunk_size': 320,
-            'retrieval_chunk_overlap': 120,
-            'graph_chunk_size': 512,
-            'graph_chunk_overlap': 50,
-            'relation_compat_threshold': 0.11,
-            'final_weight_cutoff': 0.035,
-            'max_triplets_per_chunk': 15,
-            'llm_model': 'gpt-4o-mini',
-            'llm_timeout': 120.0,
-
-            # Self-RAG設定
-            'enable_self_rag': True,                    # Self-RAGを有効化
-            'self_rag_confidence_threshold': 0.75,       # 再生成の閾値
-            'self_rag_critic_model': None,     # 評価用LLM
-            'self_rag_refiner_model': None,         # 再生成用LLM（より高性能）
-            'self_rag_max_retries': 1,                  # 最大再試行回数
-            'self_rag_token_budget': 100000,            # トークン予算
-            'self_rag_validation_checks': [             # 検証項目
-                'entity_quality',
-                'relation_clarity',
-                'grammar',
-                'redundancy'
-            ],
-            # Multi-hop設定（最適化版）
-            'multihop_beam_width': 2,                   # ビーム幅を狭く
-            'multihop_max_paths': 50,                   # パス数上限を追加
-            # RAPL最適化設定
-            'rapl_max_entities': 100,           # Inter計算で処理する最大エンティティ数
-            'rapl_min_shared_triples': 3,       # 共有トリプル数の最小値（2→3）
-            'neo4j_batch_size': 1000,           # Neo4jバッチサイズ
-
-            # AIルーティング設定
-            'ai_routing': {
-                'mode': 'api',  # 'api' or 'ollama'
-                'ollama_url': 'http://localhost:11434',
-                'api_key': None  # 環境変数から取得も可
-            },            
-            # 処理設定
-            'processing': {
-                'enable_duplicate_check': True,
-                'enable_provenance': True,
-                'log_level': 'INFO',
-                'max_workers': 4,
-            },
-
-            # Geode設定
-            'geode': {
-                'input_dir': '',
-                'output_dir': './output',
-                'patterns': ['*.pdf', '*.md', '*.docx'],
-            }
-        }
-
-        # カスタム設定があれば上書き
-        if custom_config:
-            default_config.update(custom_config)
-
-        self.config = default_config
-
-        # 🔧 フェイルセーフ: Noneのままなら基本モデルに追従
-        if self.config['self_rag_critic_model'] is None:
-            base_model = self.config.get('api_model') if self.config.get('mode') == 'api' else self.config.get('ollama_model')
-            if not base_model:
-                base_model = self.config.get('llm_model', 'gpt-4o-mini') 
+    # user_config.jsonから直接読み込む
+        if custom_config is None:
+            from ..config.config_manager import user_config
+            custom_config = user_config
     
-            self.config['self_rag_critic_model'] = base_model
-            self.logger.info(f"Critic model set to: {base_model}")
+        self.config = custom_config
+    
+        # ========================================
+        # 🔧 Self-RAG モデル設定（フェイルセーフ）
+        # ========================================
+        # 基本モデルを確定
+        if self.config.get('mode') == 'api':
+            model = self.config.get('api_model', 'gpt-4o-mini')
+        else:
+            model = self.config.get('ollama_model', '')
 
-        # refiner_modelが未設定なら基本モデルに追従（またはワンランク上）
-        if self.config['self_rag_refiner_model'] is None:
-            base_model = self.config.get('api_model') if self.config.get('mode') == 'api' else self.config.get('ollama_model')
-            if not base_model:
-                base_model = self.config.get('llm_model', 'gpt-4o-mini')
-
-            # デフォルトでは基本モデルと同じ（必要に応じて上位モデルを指定）
-            self.config['self_rag_refiner_model'] = base_model
-            self.logger.info(f"Refiner model set to: {base_model}")
+        # Refiner: 設定があればそれを使用、なければ基本モデル
+        if not self.config.get('self_rag_refiner_model'):
+            self.config['self_rag_refiner_model'] = model
+            self.logger.info(f"Refiner model set to: {model} (default)")
+        else:
+            self.logger.info(f"Refiner model set to: {self.config['self_rag_refiner_model']} (custom)")
 
         self.config.setdefault('enable_triplet_filter', True)
         self.config.setdefault('triplet_quality_threshold', 0.3)
@@ -122,9 +65,15 @@ class CrystalCluster:
             'the', 'a', 'an',
             'of', 'in', 'on', 'at',
         }
-
-        from ..model import ensure_bge_m3
-        self.embed_model = ensure_bge_m3()
+        from ..model import ensure_bge_m3, EmbeddingCache
+        self.embedding_cache = None
+        try:
+            embed_model = ensure_bge_m3()  # 自動ロード（初回インストールもしてくれる）
+            self.embedding_cache = EmbeddingCache(embed_model=embed_model)
+            self.logger.info("✅ BGE-M3 shared embedding cache initialized in Cluster")
+        except Exception as e:
+            self.logger.warning(f"⚠️ BGE-M3 cache init failed: {e}. Embedding features disabled.")
+            self.embedding_cache = None
 
         # AI Router初期化
         self.ai_router = AIRouter(config={
