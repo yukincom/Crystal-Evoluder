@@ -449,7 +449,7 @@ class GraphBuilder:
 
         # 3-1. エンティティ→Triple インデックス構築
         entity_to_triples = defaultdict(set)
-        for idx, (s, r, o) in enumerate(all_triples):
+        for idx, (s, _, o) in enumerate(all_triples):
             entity_to_triples[s].add(idx)
             entity_to_triples[o].add(idx)
 

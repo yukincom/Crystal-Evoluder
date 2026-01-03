@@ -6,7 +6,7 @@ from typing import List, Dict, Any, Tuple
 
 from llama_index.core import Document
 
-from shared import ErrorCollector
+from ..shared import ErrorCollector
 
 
 class RetrievalBuilder:
