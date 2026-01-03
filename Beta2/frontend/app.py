@@ -23,7 +23,7 @@ from frontend.components.dictionary_manager import render_dictionary_manager
 # ページ設定
 st.set_page_config(
     page_title="Crystal Cluster",
-    page_icon="🔮",
+    page_icon="💎",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -35,7 +35,7 @@ def main():
     """メイン関数"""
 
     # ヘッダー
-    st.title("🔮 Crystal Cluster")
+    st.title("💎 Crystal Cluster")
     st.markdown("*Knowledge Graph RAG System*")
 
     # タブ作成
@@ -72,7 +72,7 @@ def main():
         st.header("システム情報")
 
         # 保存/読み込みボタン
-        if st.button("💾 設定を保存", type="primary"):
+        if st.button(" 設定を保存", type="primary"):
             if config_manager.save_config():
                 st.success("設定を保存しました")
             else:
