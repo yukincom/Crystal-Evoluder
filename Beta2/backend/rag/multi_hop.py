@@ -5,8 +5,8 @@ import numpy as np
 from typing import List, Dict, Any, Set, Tuple
 
 import networkx as nx
-from model import ensure_bge_m3
-from builders.retrieval_builder import RetrievalBuilder
+from ..model. embed import ensure_bge_m3
+from ..builders.retrieval_builder import RetrievalBuilder
 
 
 class MultiHopExplorer:
