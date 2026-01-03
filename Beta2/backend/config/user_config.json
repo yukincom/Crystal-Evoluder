@@ -6,17 +6,21 @@
     "database": "neo4j"
   },
   "ai": {
-    "mode": "ollama",
+    "mode": "api",
     "ollama_url": "http://localhost:11434",
-    "api_key": "",
-    "api_model": "gpt-4o-mini",
-    "ollama_model": "",                    
-    "vision_model": "granite3.2-vision",   
+    "api_model": "",
+    "ollama_model": "qwen2.5-coder:7b-instruct",
+    "api_key": "eeee",
+
+    "quality_mode": "api",
+    "quality_check_api_model": "gpt-4o-mini",
+    "quality_check_ollama_model": "",
+    "quality_check_api_key": "",
     
-    "refiner_mode": null,
-    "refiner_ollama_url": null,
-    "refiner_api_key": null,
-    "refiner_model": null
+    "refiner_mode": "api",
+    "refiner_api_key": "dd",
+    "refiner_api_model": "gpt-4o-mini",
+    "refiner_ollama_model": "qwen2.5-coder:7b-instruct"
   },
   "parameters": {
     "entity_linking_threshold": 0.88,
@@ -31,13 +35,18 @@
   "self_rag": {
     "enable": true,
     "confidence_threshold": 0.75,
+    "refiner_model": "we",
     "max_retries": 1,
     "token_budget": 100000
   },
   "processing": {
     "input_dir": "",
     "output_dir": "./output",
-    "patterns": ["*.pdf", "*.md", "*.docx"]
+    "patterns": [
+      "*.pdf",
+      "*.md",
+      "*.docx"
+    ]
   },
   "advanced": {
     "graph_chunk_size": 512,
@@ -48,17 +57,8 @@
     "relation_compat_threshold": 0.11,
     "final_weight_cutoff": 0.035,
     "max_triplets_per_chunk": 15,
-    
     "self_rag_enabled": true,
     "self_rag_threshold": 0.75,
-    
-    "self_rag_critic_model": "",
-    "self_rag_critic_mode": "ollama",
-    "self_rag_refiner_model": "",
-    "self_rag_refiner_mode": "ollama",
-    "self_rag_refiner_ollama_url": null,
-    "self_rag_refiner_api_key": null,
-    
     "self_rag_max_retries": 1,
     "self_rag_token_budget": 100000
   }

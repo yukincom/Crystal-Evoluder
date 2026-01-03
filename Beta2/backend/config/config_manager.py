@@ -9,6 +9,8 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 import logging
 
+from ..shared.ai_router import AIRouter
+
 logger = logging.getLogger(__name__)
 
 
@@ -38,14 +40,17 @@ class ConfigManager:
             'api_key': '',
             'api_model': 'gpt-4o-mini',      # ← API用モデル
             'ollama_model': '',               # ← Ollama用モデル（空文字列でOK）
-            'vision_model': 'granite3.2-vision',
-            'llm_timeout': 120.0,
     
+            "quality_mode": None,
+            "quality_check_api_model": None,
+            "quality_check_ollama_model": None,
+            "quality_check_api_key": None,
+
             # Refiner設定
             'refiner_mode': None,
-            'refiner_ollama_url': None,
             'refiner_api_key': None,
-            'refiner_model': None,
+            'refiner_api_model': None,
+            'refiner_ollama_model': None,
 
         },
 
@@ -65,7 +70,6 @@ class ConfigManager:
         'self_rag': {
             'enable': True,
             'confidence_threshold': 0.75,
-            'critic_model': None,
             'refiner_model': None,
             'max_retries': 1,
             'token_budget': 100000,
@@ -223,37 +227,69 @@ class ConfigManager:
         Returns:
             CrystalClusterに渡せる形式の設定辞書
         """
+        # 基本モデルを決定
+        model = (
+            self.config['ai']['api_model'] 
+            if self.config['ai']['mode'] == 'api' 
+            else self.config['ai']['ollama_model']
+        )
+    
+        # 品質チェックモデルを決定
+        quality_mode = self.config['ai'].get('quality_mode')
+        if quality_mode == 'api':
+            quality_check_model = self.config['ai'].get('quality_check_api_model', self.config['ai']['api_model'])
+        elif quality_mode == 'ollama':
+            quality_check_model = self.config['ai'].get('quality_check_ollama_model', self.config['ai']['ollama_model'])
+        else:
+            quality_check_model = None  # nullなら基本モデルに追従
+    
+        # Refinerモデルを決定
+        refiner_mode = self.config['ai'].get('refiner_mode')
+        if refiner_mode == 'api':
+            refiner_model = self.config['ai'].get('refiner_api_model', self.config['ai']['api_model'])
+        elif refiner_mode == 'ollama':
+            refiner_model = self.config['ai'].get('refiner_ollama_model', self.config['ai']['ollama_model'])
+        else:
+            refiner_model = None  # nullなら基本モデルに追従
         return {
             # 基本パラメータ
             **self.config['parameters'],
 
-            # LLM設定
-            'llm_model': self.config['ai']['llm_model'],
-            'llm_timeout': self.config['ai']['llm_timeout'],
+            # AI設定（AIRouterが期待する形式）
+            'mode': self.config['ai']['mode'],
+            'api_model': self.config['ai']['api_model'],
+            'ollama_model': self.config['ai']['ollama_model'],
+            'api_key': self.config['ai']['api_key'],
+            'ollama_url': self.config['ai']['ollama_url'],
 
-            # Self-RAG
+            # 品質チェック専用
+            'quality_mode': quality_mode,
+            'quality_check_api_model': self.config['ai'].get('quality_check_api_model'),
+            'quality_check_ollama_model': self.config['ai'].get('quality_check_ollama_model'),
+            'quality_check_api_key': self.config['ai'].get('quality_check_api_key'),
+        
+            # Refiner専用
+            'refiner_mode': refiner_mode,
+            'refiner_api_model': self.config['ai'].get('refiner_api_model'),
+            'refiner_ollama_model': self.config['ai'].get('refiner_ollama_model'),
+            'refiner_api_key': self.config['ai'].get('refiner_api_key'),
+
+            # Self-RAG設定
             'enable_self_rag': self.config['self_rag']['enable'],
             'self_rag_confidence_threshold': self.config['self_rag']['confidence_threshold'],
-            'self_rag_critic_model': self.config['self_rag']['critic_model'],
-            'self_rag_refiner_model': self.config['self_rag']['refiner_model'],
+            'self_rag_critic_model': model,  # Criticは常に基本モデル
+            'self_rag_refiner_model': refiner_model or model,  # RefinerはカスタムOK
             'self_rag_max_retries': self.config['self_rag']['max_retries'],
             'self_rag_token_budget': self.config['self_rag']['token_budget'],
-
             # 処理設定
             'enable_duplicate_check': self.config['processing']['enable_duplicate_check'],
             'enable_provenance': self.config['processing']['enable_provenance'],
             'max_workers': self.config['processing']['max_workers'],
 
-            # AI Routing
-            'ai_routing': {
-                'mode': self.config['ai']['mode'],
-                'ollama_url': self.config['ai']['ollama_url'],
-                'api_key': self.get_api_key('openai'),
-            },
-
             # Neo4j
             'neo4j': self.get_neo4j_config(),
         }
+
 
     def reset_to_defaults(self):
         """設定をデフォルトにリセット"""
