@@ -4,8 +4,8 @@ APIキー管理コンポーネント
 
 import streamlit as st
 import requests
-from utils.config_manager import get_config_manager
-from utils.validators import (
+from ...backend.utils.config_manager import get_config_manager
+from ...backend.utils.validators import (
     validate_openai_api_key,
     validate_anthropic_api_key,
     validate_ollama_connection
@@ -95,19 +95,37 @@ def _detect_local_models(ollama_url: str) -> dict:
 
     Returns:
         {
-            'llm': [{'name': 'llama3.1:70b', 'size': 40, 'capable': True}, ...],
+                    'name': 'qwen2.5:7b',
+                    'size': 7.0,
+                    'capable': True,
+                    'is_vision': False,
+                    'recommended_for_base': False,      # 14B未満
+                    'recommended_for_quality': True     # 7B以上
+                },
+                {
+                    'name': 'qwen2.5:14b',
+                    'size': 14.0,
+                    'capable': True,
+                    'is_vision': False,
+                    'recommended_for_base': True,       # 14B以上
+                    'recommended_for_quality': True     # 7B以上
+                },
             'vision': [{'name': 'granite3.2-vision', 'size': 2.4, 'capable': True}, ...]
         }
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    
     try:
         response = requests.get(f"{ollama_url}/api/tags", timeout=3)
 
         if response.status_code != 200:
+            logger.warning(f"Ollama API returned status {response.status_code}")
             return {'llm': [], 'vision': []}
 
         models_data = response.json().get('models', [])
 
-        llm_models = []
+        ollama_models = []
         vision_models = []
 
         for model in models_data:
@@ -115,41 +133,50 @@ def _detect_local_models(ollama_url: str) -> dict:
             size_bytes = model.get('size', 0)
             size_gb = size_bytes / (1024 ** 3)
 
-            # サイズから能力を推定（70B = 約40GB）
-            is_capable = size_gb >= 20  # 70B未満を非推奨
+            usable = size_gb >= 4                    # 7B以上（4GB+）
+            recommended_for_quality = size_gb >= 4   # Quality用推奨（7B以上）
+            recommended_for_base = size_gb >= 8      # Base用推奨（14B以上 = 8GB+）
 
             # Vision系とLLM系を分類
-            if any(keyword in name.lower() for keyword in ['vision', 'llava', 'granite']):
+            is_vision = any(keyword in name.lower() for keyword in ['vision', 'llava', 'granite', 'cogvlm'])
+            
+            if is_vision:
                 vision_models.append({
                     'name': name,
                     'size': round(size_gb, 1),
-                    'capable': True  # Visionは能力制限なし
+                    'capable': True,  # Visionモデルは能力制限なし
+                    'is_vision': True
                 })
             else:
-                llm_models.append({
+                ollama_models.append({
                     'name': name,
                     'size': round(size_gb, 1),
-                    'capable': is_capable
+                    'capable': usable,                          # 基本的な使用可否
+                    'is_vision': False,
+                    'recommended_for_base': recommended_for_base,      # Base用推奨フラグ
+                    'recommended_for_quality': recommended_for_quality # Quality用推奨フラグ
                 })
 
-        return {'llm': llm_models, 'vision': vision_models}
+        logger.info(f"Detected {len(ollama_models)} LLM models, {len(vision_models)} Vision models")
+        
+        return {'llm': ollama_models, 'vision': vision_models}
 
-    except Exception:
+    except Exception as e:
+        logger.error(f"Failed to detect Ollama models: {e}")
         return {'llm': [], 'vision': []}
-
 
 def _render_local_model_selector(config_mgr, available_models):
     """ローカルモデル選択UI"""
 
-    llm_models = available_models['llm']
+    ollama_models = available_models['llm']
 
-    if not llm_models:
+    if not ollama_models:
         st.warning("""
         ⚠️ **ローカルモデルが見つかりません**
 
         Ollamaをインストールしてモデルをダウンロードしてください：
         ```bash
-        ollama pull llama3.1:70b
+        ollama pull llama2:13b
         ```
         """)
         # APIモードへの切り替えを提案
@@ -157,12 +184,11 @@ def _render_local_model_selector(config_mgr, available_models):
         return
 
     # 能力別に分類
-    capable_models = [m for m in llm_models if m['capable']]
-    weak_models = [m for m in llm_models if not m['capable']]
+    capable_models = [m for m in ollama_models if m['capable']]
+    weak_models = [m for m in ollama_models if not m['capable']]
 
     # モデル選択
-    current_model = config_mgr.get('ai', 'llm_model', '')
-
+    current_model = config_mgr.get('ai', 'ollama_model', '')
     # selectboxのオプション作成
     model_options = []
     model_display = {}
@@ -189,20 +215,20 @@ def _render_local_model_selector(config_mgr, available_models):
         options=model_options,
         index=default_index,
         format_func=lambda x: model_display[x],
-        help="70B以上のモデルを推奨（40GB以上）",
-        key="local_llm_model"
+        help="13B以上のモデルを推奨（7.4GB以上）",
+        key="ollama_model"
     )
 
-    config_mgr.set('ai', 'llm_model', selected_model)
+    config_mgr.set('ai', 'ollama_model', selected_model)
 
     # 警告表示
-    selected_info = next((m for m in llm_models if m['name'] == selected_model), None)
+    selected_info = next((m for m in ollama_models if m['name'] == selected_model), None)
     if selected_info and not selected_info['capable']:
         st.warning("""
         ⚠️ **非推奨モデル**
 
         このモデルは性能が不十分な可能性があります。
-        高品質な結果を得るには70B以上のモデル（40GB+）を使用してください。
+        高品質な結果を得るには14B以上のモデル（3.7GB+）を使用してください。
         """)
 
     # APIキー入力欄（グレーアウト）
@@ -218,28 +244,28 @@ def _render_local_model_selector(config_mgr, available_models):
 def _render_api_model_selector(config_mgr):
     """APIモデル選択UI"""
 
-    current_model = config_mgr.get('ai', 'llm_model', 'gpt-4o-mini')
+    current_model = config_mgr.get('ai', 'api_model', 'gpt-4o-mini')
 
-    llm_model = st.text_input(
+    api_model = st.text_input(
         "LLMモデル",
         value=current_model,
         placeholder="gpt-4o-mini",
         help=" GPT-4o-mini以上を推奨",
-        key="api_llm_model"
+        key="api_model"
     )
 
-    config_mgr.set('ai', 'llm_model', llm_model)
+    config_mgr.set('ai', 'api_model', api_model)
 
     # 推奨モデルのヒント
     st.caption("""
     📝 **推奨モデル**
-    OpenAI: `gpt-4o-mini`, `gpt-4o`, `gpt-4-turbo`
+    OpenAI: `gpt-4o-mini`, `gpt-5-mini`
     Anthropic: `claude-3-5-sonnet-20241022`, `claude-3-haiku-20240307`
     """)
 
     # コスト警告
-    if 'gpt-4' in llm_model and 'mini' not in llm_model:
-        st.warning("⚠️ GPT-4（非mini）は高コストです。大量処理には注意してください。")
+    if 'gpt-5' in api_model and 'mini' not in api_model:
+        st.warning("⚠️ 非 mini は高コストです。大量処理には注意してください。")
 
 
 def _render_api_key_input(config_mgr):
@@ -250,8 +276,8 @@ def _render_api_key_input(config_mgr):
     col1, col2 = st.columns([4, 1])
 
     with col1:
-        # 現在のLLMモデルからプロバイダーを推定
-        current_model = config_mgr.get('ai', 'llm_model', '')
+        # 現在のAPIモデルからプロバイダーを推定
+        current_model = config_mgr.get('ai', 'api_model', '')
 
         if 'claude' in current_model.lower():
             provider = 'anthropic'
@@ -295,7 +321,19 @@ def _render_api_key_input(config_mgr):
 
     st.caption(f"🔗 [APIキーを取得]({link})")
 
+async def get_ollama_models(config_mgr):
+    """Ollamaモデル一覧を取得（フロントエンド用に拡張）"""
+    ollama_url = config_mgr.get('ai', 'ollama_url')  
 
+    models = _detect_local_models(ollama_url)
+
+    # フロントエンド用に統合（llm + vision）
+    all_models = models['llm'] + models['vision']
+
+    return {
+        "available": len(all_models) > 0,
+        "models": all_models  
+    }
 def _render_vision_model_selector(config_mgr, mode, available_models):
     """図表解析モデル選択UI"""
 
