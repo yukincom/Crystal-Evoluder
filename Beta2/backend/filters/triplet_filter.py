@@ -4,10 +4,7 @@
 import numpy as np
 from typing import List, Tuple, Dict, Any, Optional
 
-from llama_index.llms.openai import OpenAI
-
-from shared import safe_execute
-
+from ..shared import safe_execute
 
 class TripletFilter:
     """トリプレットの品質管理とSelf-RAGを担当"""
@@ -41,6 +38,33 @@ class TripletFilter:
             'the', 'a', 'an',
             'of', 'in', 'on', 'at',
         }
+    # BGE-M3をクラスでロード（1回だけ）
+        self.embedder = None
+        self.blacklist_embs = None
+        self.useful_rel_embs = None
+
+        if hasattr(self, 'embedding_cache') and self.embedding_cache is not None:
+            try:
+                self.blacklist_embs = [
+                    self.embedding_cache.get_embedding(rel.lower())
+                    for rel in self.relation_blacklist
+                ]
+
+                self.logger.info("✅ Blacklist embeddings precomputed with BGE-M3 cache")
+
+                # 有用関係リスト（例：論文でよく使われる関係を追加）
+                useful_relations = [
+                    "causes", "affects", "treats", "indicates",
+                    "associated_with", "correlates_with", "leads_to"
+                ]
+                self.useful_rel_embs = [
+                    self.embedding_cache.get_embedding(rel.lower())
+                    for rel in useful_relations
+                ]
+
+                self.logger.info("✅ Useful relation embeddings precomputed with BGE-M3 cache")
+            except Exception as e:
+                self.logger.warning(f"⚠️ Precomputing embeddings failed: {e}")
 
     def filter_triplets(
         self,
@@ -388,7 +412,7 @@ class TripletFilter:
         self,
         original_triplet: Tuple[str, str, str],
         chunk_text: str,
-        ai_router: Any = None
+        ai_router: Any
     ) -> Tuple[Optional[Tuple[str, str, str]], int]:
         """
         低品質トリプレットを再生成
@@ -405,7 +429,9 @@ class TripletFilter:
 
         # LLMが提供されていない場合は初期化
         if ai_router is None:
-            raise ValueError("AIRouter instance is required")
+            self.logger.error("AIRouter not provided for refinement")
+            return None, 0
+
 
         # ============================================================
         # プロンプト構築
@@ -433,16 +459,20 @@ class TripletFilter:
 
     If the original triplet cannot be improved, return "NO_IMPROVEMENT".
     """
-        # 簡易実装: 文字数 / 4 ≈ トークン数（英語）
-        prompt_tokens = len(prompt) // 4
 
         # ============================================================
         # LLMで再生成
         # ============================================================
         try:
-            response = llm.complete(prompt)
+            # AIRouter経由でRefinerモデルを使って生成！！
+            response = ai_router.complete(
+                prompt=prompt,
+                model=self.refiner_model 
+            )
             response_text = response.text.strip()
 
+            # トークン数推定（簡易）
+            prompt_tokens = len(prompt) // 4
             response_tokens = len(response_text) // 4
             total_tokens = prompt_tokens + response_tokens
 
@@ -655,44 +685,73 @@ class TripletFilter:
 
         return score >= min_score
 
-    def _compute_triplet_quality(
-        self,
-        subject: str,
-        relation: str,
-        object_: str
-    ) -> float:
+    def _compute_triplet_quality(self, s: str, r: str, o: str) -> float:
         """
-        トリプレットの品質スコアを計算
+        トリプレットの品質をBGE-M3 + ルールベースでスコアリング（API完全排除版）
 
-        スコアリング基準：
-        - 関係の明確性（0.4）
-        - エンティティの具体性（0.3）
-        - 文法的正しさ（0.3）
+        Args:
+            s: subject (主語)
+            r: relation (関係)
+            o: object (目的語)
 
         Returns:
-            0.0~1.0 のスコア
+            float: 品質スコア (0.0〜1.0)
         """
-        score = 0.0
+        score = 1.0
 
-        # ============================================================
-        # 1. 関係の明確性（0.4）
-        # ============================================================
-        relation_score = self._score_relation(relation)
-        score += relation_score * 0.4
+        # 1. 基本的な文字列チェック（ルールベース、LLM不要）
+        s_lower = s.lower().strip()
+        r_lower = r.lower().strip()
+        o_lower = o.lower().strip()
 
-        # ============================================================
-        # 2. エンティティの具体性（0.3）
-        # ============================================================
-        entity_score = self._score_entities(subject, object_)
-        score += entity_score * 0.3
+        # 空・短すぎるチェック
+        if len(s_lower) < 2 or len(r_lower) < 2 or len(o_lower) < 2:
+            score -= 0.4
 
-        # ============================================================
-        # 3. 文法的正しさ（0.3）
-        # ============================================================
-        grammar_score = self._score_grammar(subject, relation, object_)
-        score += grammar_score * 0.3
+        # 数字だけ/記号だけのエンティティ
+        if s_lower.isdigit() or o_lower.isdigit() or not any(c.isalnum() for c in s_lower):
+            score -= 0.3
+        if r_lower in self.relation_blacklist:
+            score -= 0.3
 
-        return min(max(score, 0.0), 1.0)
+        # 自己参照（主語と目的語が同じ）
+        if s_lower == o_lower:
+            score -= 0.5
+
+        # 主語/関係/目的語が重複
+        if s_lower == r_lower or o_lower == r_lower:
+            score -= 0.3
+
+        # 2. BGE-M3を使った関係品質チェック
+        if hasattr(self, 'embedding_cache') and self.embedding_cache is not None:
+            try:
+                # 関係文字列を埋め込み
+                r_emb = self.embedding_cache.get_embedding(r.lower())
+                # ブラックリストとの最大類似度
+                if hasattr(self, 'blacklist_embs') and self.blacklist_embs:
+                    max_sim = max(
+                        np.dot(r_emb, be) / (np.linalg.norm(r_emb) * np.linalg.norm(be) + 1e-9)
+                        for be in self.blacklist_embs 
+                    )
+                    score -= max_sim * 0.8  # 類似度0.8以上で大幅減点
+                    # 有用関係リスト（事前定義）との最大類似度（高いほど加点）
+                if hasattr(self, 'useful_rel_embs') and self.useful_rel_embs:
+                    max_useful_sim = max(
+                        np.dot(r_emb, ue) / (np.linalg.norm(r_emb) * np.linalg.norm(ue) + 1e-9)
+                        for ue in self.useful_rel_embs
+                    )
+                    score += max_useful_sim * 0.4
+            
+                # エンティティの具体性（埋め込みノルム長で簡易判定）
+                s_emb = self.embedding_cache.get_embedding(s_lower)
+                o_emb = self.embedding_cache.get_embedding(o_lower)
+                s_specificity = min(1.0, np.linalg.norm(s_emb) / 0.5)  # スケール調整
+                o_specificity = min(1.0, np.linalg.norm(o_emb) / 0.5)
+                score += (s_specificity + o_specificity) * 0.3
+            except Exception as e:
+                self.logger.warning(f"BGE-M3 quality check failed in triplet: {e}. Using rule-based only.")    
+
+        return max(min(score, 1.0), 0.0)
 
     def _map_triplets_to_documents(
         self,
