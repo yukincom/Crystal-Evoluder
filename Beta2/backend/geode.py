@@ -15,12 +15,13 @@ import concurrent.futures
 import time
 import argparse
 import json
+import requests
+
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, List, Dict, Tuple, Any, Set
-from contextlib import contextmanager
+from sentence_transformers import SentenceTransformer
 
-import requests
 from llama_index.core import Document
 from llama_index.graph_stores.neo4j import Neo4jGraphStore
 
@@ -35,12 +36,14 @@ from shared.quality_checker import DataQualityChecker
 from shared.duplicate_checker import ProvenanceManager
 from shared.utils.hashing import compute_file_hash
 
-from shared import (
+from shared.text_utils import (
     clean_text,
     chunk_by_paragraphs,
+)
+from shared.file_utils import (
     collect_files,
-    sanitize_filename,
-    detect_encoding,
+#    sanitize_filename,
+#    detect_encoding,
     detect_format
 )
 from shared.parsers import parse_tei, parse_markdown, parse_txt, parse_docx, parse_html, parse_pdf
@@ -63,7 +66,17 @@ class CrystalGeode:
         self.metadata = {}
         self.logger = setup_logger('CrystalGeode', log_level)
         self.hlogger = HierarchicalLogger(self.logger)
-        
+       
+        # BGE-M3共有キャッシュをここで初期化（1回だけロード）
+        from .model.embed import ensure_bge_m3, EmbeddingCache 
+        try:
+            self.embed_model = ensure_bge_m3()  # 自動ロード
+            self.embedding_cache = EmbeddingCache(embed_model=self.embed_model)
+            self.logger.info("✅ BGE-M3 shared embedding cache initialized")
+        except Exception as e:
+            self.logger.warning(f"⚠️ BGE-M3 initialization failed: {e}. Embedding features disabled.")
+            self.embedding_cache = None
+
         # Grobid設定
         self.grobid_url = self.config.get('grobid_url', 'http://localhost:8070')
         self.grobid_available = self._check_grobid()
@@ -102,6 +115,7 @@ class CrystalGeode:
     def _check_grobid(self) -> bool:
         """Grobidサーバーが起動しているか確認"""
         try:
+            
             response = requests.get(f"{self.grobid_url}/api/isalive", timeout=2)
             return response.status_code == 200
         except:
@@ -598,17 +612,18 @@ class CrystalGeode:
 # ============================================================
 if __name__ == "__main__":
     
-    parser = argparse.ArgumentParser(description='Crystal Geode v1.1')
-    geode.add_argument('command', choices=['parse', 'batch'])
-    geode.add_argument('input_file', help='Input file or directory')
-    geode.add_argument('--format', default='auto')
-    geode.add_argument('--review-dir', default='./review')
-    geode.add_argument('--debug', action='store_true')
-    geode.add_argument('--max-workers', type=int, default=4)
+    parser = argparse.ArgumentParser(description='Crystal Geode Beta')
+    
+    parser.add_argument('command', choices=['parse', 'batch'])
+    parser.add_argument('input_file', help='Input file or directory')
+    parser.add_argument('--format', default='auto')
+    parser.add_argument('--review-dir', default='./review')
+    parser.add_argument('--debug', action='store_true')
+    parser.add_argument('--max-workers', type=int, default=4)
     
     args = parser.parse_args()
     
-    print("🔮 Crystal Geode v1.1")
+    print("🌋 Crystal Geode Beta")
     print("━" * 42)
     
     app = CrystalGeode(log_level=logging.DEBUG if args.debug else logging.INFO)

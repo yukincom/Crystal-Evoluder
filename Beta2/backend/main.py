@@ -9,6 +9,7 @@ import requests
     
 from pathlib import Path
 
+
 app = FastAPI(title="Crystal Cluster API", version="1.0")
 
 # CORS設定
@@ -30,7 +31,6 @@ class Neo4jConfig(BaseModel):
     password: str = ""
     database: str = "neo4j"
 
-
 class AIConfig(BaseModel):
     mode: str = "api"  # "api" or "ollama"
     ollama_url: str = "http://localhost:11434"
@@ -40,16 +40,21 @@ class AIConfig(BaseModel):
     ollama_model: str = ""
     
     # 後方互換性のため残す（非推奨）
-    llm_model: Optional[str] = None
+    # llm_model: Optional[str] = None
     
     api_key: str = ""
-    vision_model: str = "granite3.2-vision"
-    
+    # vision_model: str = "granite3.2-vision"
+    # 品質チェック専用のオーバーライド設定
+    quality_mode: Optional[str] = None
+    quality_check_ollama_model: Optional[str] = None
+    quality_check_api_model: Optional[str] = None
+    quality_check_api_key: Optional[str] = None
+
     # Refiner専用のオーバーライド設定
     refiner_mode: Optional[str] = None
-    refiner_ollama_url: Optional[str] = None
     refiner_api_key: Optional[str] = None
-    refiner_model: Optional[str] = None
+    refiner_ollama_model: Optional[str] = None
+    refiner_api_model: Optional[str] = None
 
 class ParametersConfig(BaseModel):
     entity_linking_threshold: float = 0.88
@@ -65,8 +70,8 @@ class ParametersConfig(BaseModel):
 class SelfRAGConfig(BaseModel):
     enable: bool = True
     confidence_threshold: float = 0.75
-    # criticは完全にメインに固定（設定不可）
-    # refinerはオーバーライド可能（AIConfig側で管理）
+    # Refinerだけオーバーライド可能（Noneならメインを使う）
+    refiner_model: Optional[str] = None
     max_retries: int = 1
     token_budget: int = 100000
 
@@ -92,16 +97,6 @@ class AdvancedConfig(BaseModel):
     # Self-RAG設定
     self_rag_enabled: bool = True
     self_rag_threshold: float = 0.75
-    
-    # Critic（読み取り専用、メインに追従）
-    self_rag_critic_model: str = "gpt-4o-mini"
-    self_rag_critic_mode: str = "api"
-    
-    # Refiner（編集可能）
-    self_rag_refiner_model: str = "gpt-4o-mini"
-    self_rag_refiner_mode: str = "api"
-    self_rag_refiner_ollama_url: Optional[str] = None
-    self_rag_refiner_api_key: Optional[str] = None
     
     self_rag_max_retries: int = 1
     self_rag_token_budget: int = 100000
@@ -146,18 +141,18 @@ def load_config() -> FullConfig:
             
             if response.status_code == 200:
                 models_data = response.json().get('models', [])
-                llm_models = []
+                ollama_models = []
                 
                 for model in models_data:
                     name = model.get('name', '')
                     # Visionモデルを除外
                     if not any(kw in name.lower() for kw in ['vision', 'llava', 'granite']):
-                        llm_models.append(name)
+                        ollama_models.append(name)
                 
                 # ollama_modelが未設定または無効な場合、自動設定
-                if not config.ai.ollama_model or config.ai.ollama_model not in llm_models:
-                    if llm_models:
-                        config.ai.ollama_model = llm_models[0]  # 最初のモデルを使用
+                if not config.ai.ollama_model or config.ai.ollama_model not in ollama_models:
+                    if ollama_models:
+                        config.ai.ollama_model = ollama_models[0]  # 最初のモデルを使用
                         print(f"✅ Ollama model auto-detected: {config.ai.ollama_model}")
                     else:
                         print("⚠️ No Ollama LLM models found")
@@ -166,21 +161,9 @@ def load_config() -> FullConfig:
         except Exception as e:
             print(f"⚠️ Could not connect to Ollama: {e}")
             config.ai.ollama_model = ""
-
-    # --- フロント用のAdvancedConfigを最新状態に同期 ---
+    
+    # advanced セクション同期（フロントエンド表示用）
     adv = config.advanced
-    # 追加: 基本モデルを取得
-    base_model = config.ai.api_model if config.ai.mode == 'api' else config.ai.ollama_model
-    
-    # Critic：常にメインに追従（編集不可）
-    adv.self_rag_critic_model = base_model
-    adv.self_rag_critic_mode = config.ai.mode
-    
-    # Refiner：オーバーライドがあればそれ優先、なければメインに追従
-    adv.self_rag_refiner_model = config.ai.refiner_model or base_model
-    adv.self_rag_refiner_mode = config.ai.refiner_mode or config.ai.mode
-    adv.self_rag_refiner_ollama_url = config.ai.refiner_ollama_url or config.ai.ollama_url
-    adv.self_rag_refiner_api_key = config.ai.refiner_api_key or config.ai.api_key
     
     # Self-RAGの基本設定も同期
     adv.self_rag_enabled = config.self_rag.enable
@@ -209,6 +192,11 @@ def save_config(config: FullConfig):
 # ========================================
 # 設定管理エンドポイント
 # ========================================
+# main.py の設定管理エンドポイント部分
+
+# ========================================
+# 設定管理エンドポイント
+# ========================================
 
 @app.get("/config")
 async def get_config():
@@ -218,12 +206,39 @@ async def get_config():
 
 @app.post("/config")
 async def update_config(config: FullConfig):
-    """設定を更新"""
+    """
+    設定を更新（検証付き）
+    
+    フロントエンドから送られた設定を保存し、
+    実行中のAIRouterインスタンスがあれば即座に更新する
+    """
     try:
+        # 1. ファイルに保存
         save_config(config)
-        return {"status": "ok", "message": "Configuration saved"}
+        
+        # 2. グローバルインスタンスがあればAIRouterを更新
+        global cluster_instance
+        if cluster_instance and hasattr(cluster_instance, 'ai_router'):
+            # 新しい設定でAIRouterを更新
+            new_ai_config = config.ai.model_dump()
+            cluster_instance.ai_router.update_config(new_ai_config)
+            
+            return {
+                "status": "ok",
+                "message": "✅ 設定を保存し、AIルーターを更新しました"
+            }
+        
+        # インスタンスがない場合は保存のみ
+        return {
+            "status": "ok",
+            "message": "✅ 設定を保存しました（次回起動時に反映されます）"
+        }
+        
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=400,
+            detail=f"❌ 保存失敗: {str(e)}"
+        )
 
 @app.post("/config/neo4j/test")
 async def test_neo4j_connection(neo4j: Neo4jConfig):
@@ -242,50 +257,53 @@ async def test_neo4j_connection(neo4j: Neo4jConfig):
         
         driver.close()
         
-        return {"status": "ok", "message": "Connection successful"}
+        return {"status": "ok", "message": "✅ Connection successful"}
     
     except Exception as e:
         raise HTTPException(
             status_code=400,
-            detail=f"Connection failed: {str(e)}"
+            detail=f"❌ Connection failed: {str(e)}"
         )
 
 @app.get("/config/ollama/models")
 async def get_ollama_models():
     """Ollamaのインストール済みモデルを取得"""
     config = load_config()
+    ollama_url = config.ai.ollama_url
     
     try:
-        response = requests.get(
-            f"{config.ai.ollama_url}/api/tags",
-            timeout=3
-        )
-        
+        response = requests.get(f"{ollama_url}/api/tags", timeout=3)
         if response.status_code != 200:
             return {"models": [], "available": False}
-        
+
         models_data = response.json().get('models', [])
-        
         models = []
+
         for model in models_data:
             name = model.get('name', '')
             size_bytes = model.get('size', 0)
             size_gb = round(size_bytes / (1024 ** 3), 1)
-            
-            # サイズから能力を推定
-            capable = size_gb >= 20  # 70B未満は非推奨
-            
+
+            # ✅ 3段階判定
+            usable = size_gb >= 4                    # 最低限使える（7B以上）
+            recommended_for_quality = size_gb >= 4   # Quality用推奨
+            recommended_for_base = size_gb >= 8      # Base用推奨（14B以上）
+
+            is_vision = any(kw in name.lower() for kw in ['vision', 'llava', 'granite'])
+
             models.append({
                 'name': name,
                 'size': size_gb,
-                'capable': capable,
-                'is_vision': any(kw in name.lower() for kw in ['vision', 'llava', 'granite'])
+                'capable': usable,
+                'is_vision': is_vision,
+                'recommended_for_base': recommended_for_base,
+                'recommended_for_quality': recommended_for_quality
             })
         
         return {
             "models": models,
             "available": True,
-            "url": config.ai.ollama_url
+            "url": ollama_url
         }
     
     except Exception as e:
@@ -295,88 +313,18 @@ async def get_ollama_models():
             "error": str(e)
         }
 
-@app.post("/config/api/validate")
-async def validate_api_key(provider: str, api_key: str):
-    """APIキーを検証"""
-    
-    if provider == "openai":
-        if not api_key.startswith('sk-'):
-            raise HTTPException(
-                status_code=400,
-                detail="OpenAI API key must start with 'sk-'"
-            )
-        
-        try:
-            response = requests.get(
-                "https://api.openai.com/v1/models",
-                headers={"Authorization": f"Bearer {api_key}"},
-                timeout=10
-            )
-            
-            if response.status_code == 200:
-                return {"valid": True, "message": "API key is valid"}
-            elif response.status_code == 401:
-                raise HTTPException(status_code=401, detail="Invalid API key")
-            else:
-                raise HTTPException(
-                    status_code=response.status_code,
-                    detail=f"API returned status {response.status_code}"
-                )
-        
-        except requests.exceptions.Timeout:
-            raise HTTPException(status_code=408, detail="Request timeout")
-    
-    elif provider == "anthropic":
-        if not api_key.startswith('sk-ant-'):
-            raise HTTPException(
-                status_code=400,
-                detail="Anthropic API key must start with 'sk-ant-'"
-            )
-        
-        try:
-            response = requests.post(
-                "https://api.anthropic.com/v1/messages",
-                headers={
-                    "x-api-key": api_key,
-                    "anthropic-version": "2023-06-01",
-                    "content-type": "application/json"
-                },
-                json={
-                    "model": "claude-3-haiku-20240307",
-                    "max_tokens": 1,
-                    "messages": [{"role": "user", "content": "test"}]
-                },
-                timeout=10
-            )
-            
-            if response.status_code == 200:
-                return {"valid": True, "message": "API key is valid"}
-            elif response.status_code == 401:
-                raise HTTPException(status_code=401, detail="Invalid API key")
-            else:
-                raise HTTPException(
-                    status_code=response.status_code,
-                    detail=f"API returned status {response.status_code}"
-                )
-        
-        except requests.exceptions.Timeout:
-            raise HTTPException(status_code=408, detail="Request timeout")
-
-    else:
-        raise HTTPException(status_code=400, detail=f"Unknown provider: {provider}")
-
 @app.post("/test_ai")
 async def test_ai_connection(ai_config: dict):
     """
-    AI接続をテスト（APIまたはOllama）
+    AI接続をテスト（API または Ollama）
     
     Args:
         ai_config: {
             mode: 'api' | 'ollama',
             api_key: str (API mode時),
-            llm_model: str,
-            ollama_url: str (Ollama mode時),   // Ollama用モデル名を保持
-            llm_model: string 
+            api_model: str (API mode時),
+            ollama_model: str (Ollama mode時),
+            ollama_url: str (Ollama mode時)
         }
     
     Returns:
@@ -387,23 +335,23 @@ async def test_ai_connection(ai_config: dict):
     if mode == 'api':
         # APIキーの検証
         api_key = ai_config.get('api_key', '')
-        llm_model = ai_config.get('api_model', '')
+        api_model = ai_config.get('api_model', '')
         
         if not api_key:
             raise HTTPException(status_code=400, detail="APIキーが設定されていません")
         
         # プロバイダーを判定
-        if 'claude' in llm_model.lower():
+        if 'claude' in api_model.lower():
             provider = 'anthropic'
         else:
             provider = 'openai'
         
         # 既存のvalidate_api_keyを利用
         try:
-            result = await validate_api_key(provider, api_key)
+            result = await api_key(provider, api_key)
             return {
                 "success": True,
-                "message": f"✅ {provider.upper()} 接続成功！モデル: {llm_model}"
+                "message": f"✅ {provider.upper()} 接続成功！モデル: {api_model}"
             }
         except HTTPException as e:
             return {
@@ -414,7 +362,7 @@ async def test_ai_connection(ai_config: dict):
     elif mode == 'ollama':
         # Ollama接続確認
         ollama_url = ai_config.get('ollama_url', 'http://localhost:11434')
-        llm_model = ai_config.get('ollama_model', '')
+        ollama_model = ai_config.get('ollama_model', '')
         
         try:
             response = requests.get(f"{ollama_url}/api/tags", timeout=5)
@@ -429,36 +377,30 @@ async def test_ai_connection(ai_config: dict):
             model_names = [m.get('name', '') for m in models]
             
             # 指定されたモデルが存在するか確認
-            if llm_model and llm_model not in model_names:
+            if ollama_model and ollama_model not in model_names:
                 return {
                     "success": False,
-                    "message": f"❌ モデル '{llm_model}' が見つかりません"
+                    "message": f"❌ モデル '{ollama_model}' が見つかりません"
                 }
             
             # 指定されたモデルの能力チェック
-            if llm_model:
-                target_model = next((m for m in models if m.get('name') == llm_model), None)
+            if ollama_model:
+                target_model = next((m for m in models if m.get('name') == ollama_model), None)
                 if target_model:
                     size_bytes = target_model.get('size', 0)
                     size_gb = round(size_bytes / (1024 ** 3), 1)
-                    capable = size_gb >= 20  # 70B未満は非推奨
-                    
-                    if not capable:
-                        return {
-                            "success": False,
-                            "message": f"⚠️ モデル '{llm_model}' ({size_gb}GB) は能力不足です。70B以上（20GB以上）のモデルを推奨します。"
-                        }
                     
                     return {
                         "success": True,
-                        "message": f"✅ Ollama接続成功！モデル: {llm_model} ({size_gb}GB)"
+                        "message": f"✅ Ollama接続成功！モデル: {ollama_model} ({size_gb}GB)"
                     }
             
             # モデル未指定の場合
             return {
                 "success": True,
-                "message": f"✅ Ollama接続成功！"
+                "message": "✅ Ollama接続成功！"
             }
+            
         except requests.exceptions.ConnectionError:
             return {
                 "success": False,
@@ -472,39 +414,6 @@ async def test_ai_connection(ai_config: dict):
     
     else:
         raise HTTPException(status_code=400, detail=f"Unknown mode: {mode}")
-
-# ========================================
-# Geode（文書パース）エンドポイント
-# ========================================
-
-@app.post("/geode/parse")
-async def parse_documents(
-    input_dir: str,
-    output_dir: str = "./output",
-    patterns: List[str] = ["*.pdf", "*.md"]
-):
-    """文書をパースしてJSON化"""
-    try:
-        from geode import CrystalGeode
-        
-        geode = CrystalGeode(log_level=20)
-        
-        results = geode.batch_crystallize(
-            input_dir=input_dir,
-            patterns=patterns,
-            max_workers=4,
-            fail_fast=False,
-            output_json=f"{output_dir}/parsed_documents.json"
-        )
-        
-        return {
-            "status": "ok",
-            "results": results['stats'],
-            "output": f"{output_dir}/parsed_documents.json"
-        }
-    
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 # ========================================
 # 既存のエンドポイント（残す）
@@ -538,7 +447,7 @@ def get_ai_status():
         "ollama_url": config.ai.ollama_url,
         "api_configured": bool(config.ai.api_key),
         "models": {
-            "llm": config.ai.llm_model,
+            "llm": config.ai.ollama_model,
             "vision": config.ai.vision_model
         }
     }
@@ -590,16 +499,16 @@ def setup(req: ConfigRequest):
         config = load_config(req.mode, req.values)
 
         if config.get('ai_routing', {}).get('mode') == 'api':
-            base_model = config.get('api_model', 'gpt-4o-mini')
+            model = config.get('api_model', 'gpt-4o-mini')
         else:
-            base_model = config.get('ollama_model', '')
+            model = config.get('ollama_model', '')
 
         if not config.get('self_rag_critic_model'):
-            config['self_rag_critic_model'] = base_model
+            config['self_rag_critic_model'] = model
         
         # Refinerが未設定なら基本モデルに追従
         if not config.get('self_rag_refiner_model'):
-            config['self_rag_refiner_model'] = base_model
+            config['self_rag_refiner_model'] = model
 
         # CrystalCluster初期化
         cluster_instance = CrystalCluster(custom_config=config)

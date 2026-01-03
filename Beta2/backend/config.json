@@ -8,15 +8,19 @@
   "ai": {
     "mode": "ollama",
     "ollama_url": "http://localhost:11434",
+    "ollama_model": "",   
     "api_key": "",
-    "api_model": "gpt-4o-mini",
-    "ollama_model": "",                    
-    "vision_model": "granite3.2-vision",   
-    
+    "api_model": "gpt-4o-mini",                 
+
+    "quality_mode": null,
+    "quality_check_ollama_model": null,
+    "quality_check_api_model": null,
+    "quality_check_api_key": "",
+
     "refiner_mode": null,
-    "refiner_ollama_url": null,
-    "refiner_api_key": null,
-    "refiner_model": null
+    "refiner_api_key": "",
+    "refiner_ollama_model": null,
+    "refiner_api_model": null
   },
   "parameters": {
     "entity_linking_threshold": 0.88,
@@ -50,12 +54,6 @@
     "max_triplets_per_chunk": 15,
     "self_rag_enabled": true,
     "self_rag_threshold": 0.75,
-    "self_rag_critic_model": "gpt-4o-mini",
-    "self_rag_critic_mode": "api",
-    "self_rag_refiner_model": "gpt-4o-mini",
-    "self_rag_refiner_mode": "api",
-    "self_rag_refiner_ollama_url": null,
-    "self_rag_refiner_api_key": null,
     "self_rag_max_retries": 1,
     "self_rag_token_budget": 100000
   }
