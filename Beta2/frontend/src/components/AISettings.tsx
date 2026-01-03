@@ -8,14 +8,18 @@ interface OllamaModel {
   size: number;
   capable: boolean;
   is_vision: boolean;
+  recommended_for_base?: boolean;      // Base用推奨フラグ
+  recommended_for_quality?: boolean;   // Quality用推奨フラグ
 }
 
 export const AISettings: React.FC = () => {
   const [config, setConfig] = useState<Config | null>(null);
   const [loading, setLoading] = useState(false);
   const [testingAI, setTestingAI] = useState(false);
+  const [testingQualityCheck, setTestingQualityCheck] = useState(false);
   const [testingRefiner, setTestingRefiner] = useState(false);
   const [customRefiner, setCustomRefiner] = useState(false);
+  const [customQualityCheck, setCustomQualityCheck] = useState(false);
 
   // Ollamaモデル一覧
   const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([]);
@@ -24,9 +28,6 @@ export const AISettings: React.FC = () => {
 
   // LLM用モデル（Visionを除外）
   const llmModels = ollamaModels.filter(m => !m.is_vision);
-  
-  // Vision用モデル
-  const visionModels = ollamaModels.filter(m => m.is_vision);
 
   useEffect(() => {
     loadOllamaModels();
@@ -34,9 +35,12 @@ export const AISettings: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    // configが読み込まれたら、refiner_modeがnullでなければカスタム設定と判定
-    if (config && config.ai.refiner_mode !== null) {
-      setCustomRefiner(true);
+    if (config) {
+      // Refinerのカスタム判定
+      setCustomRefiner(config.ai.refiner_mode !== null);
+      
+      // 品質チェックのカスタム判定
+      setCustomQualityCheck(config.ai.quality_mode !== null);
     }
   }, [config]);
 
@@ -44,12 +48,10 @@ export const AISettings: React.FC = () => {
     // Ollamaモデル読み込み後、configがあれば検証
     if (!config || !ollamaModels.length) return;
 
-    // Ollamaモードかつ、ollama_modelが未設定 or 無効な場合
     if (config.ai.mode === 'ollama') {
       const currentModel = config.ai.ollama_model;
       
       if (!currentModel || currentModel === '') {
-        // 有効な最初のモデルを自動設定
         const firstValidModel = llmModels.find(m => m.capable);
         if (firstValidModel) {
           setConfig({
@@ -61,27 +63,6 @@ export const AISettings: React.FC = () => {
           });
           console.log('✅ Auto-selected Ollama model:', firstValidModel.name);
         }
-      } else {
-        // 設定されているモデルが有効か確認
-        const validModel = llmModels.find(m => 
-          m.name === currentModel && m.capable
-        );
-        
-        if (!validModel) {
-          console.warn('⚠️ 無効なOllamaモデルが設定されています:', currentModel);
-          // 有効な最初のモデルに置き換え
-          const firstValidModel = llmModels.find(m => m.capable);
-          if (firstValidModel) {
-            setConfig({
-              ...config,
-              ai: {
-                ...config.ai,
-                ollama_model: firstValidModel.name
-              }
-            });
-            console.log('✅ Replaced with valid Ollama model:', firstValidModel.name);
-          }
-        }
       }
     }
   }, [config, ollamaModels, llmModels]);
@@ -89,16 +70,6 @@ export const AISettings: React.FC = () => {
   const loadConfig = async () => {
     try {
       const data = await getConfig();
-    // 🔧 追加: 設定の検証とサニタイズ
-    if (data.ai.mode === 'ollama' && data.ai.ollama_model) {
-      // ollama_modelが実在するか確認（llmModelsがまだ空の場合は後でuseEffectが処理）
-      console.log('Loaded ollama_model:', data.ai.ollama_model);
-    }
-    
-    // refiner_modelも検証
-    if (data.ai.refiner_model && data.ai.refiner_mode === 'ollama') {
-      console.log('Loaded refiner_model:', data.ai.refiner_model);
-    }
       setConfig(data);
     } catch (error) {
       console.error('Failed to load config:', error);
@@ -160,6 +131,28 @@ export const AISettings: React.FC = () => {
     }
   };
 
+  const handleTestQualityCheck = async () => {
+    if (!config) return;
+    setTestingQualityCheck(true);
+
+    try {
+      const qualityCheckConfig = {
+        mode: config.ai.quality_mode || config.ai.mode,
+        api_key: config.ai.quality_check_api_key || config.ai.api_key,
+        ollama_url: config.ai.quality_check_ollama_url || config.ai.ollama_url,
+        api_model: config.ai.quality_check_api_model || config.ai.api_model,
+        ollama_model: config.ai.quality_check_ollama_model || config.ai.ollama_model,
+      };
+
+      const result = await testAIConnection(qualityCheckConfig);
+      alert(result.message || '✅ 品質チェックモデル接続成功');
+    } catch (error: any) {
+      alert(`❌ 品質チェック接続失敗: ${error.message || '不明なエラー'}`);
+    } finally {
+      setTestingQualityCheck(false);
+    }
+  };
+
   const handleTestRefiner = async () => {
     if (!config) return;
     setTestingRefiner(true);
@@ -172,8 +165,8 @@ export const AISettings: React.FC = () => {
         mode: config.ai.refiner_mode || config.ai.mode,
         api_key: config.ai.refiner_api_key || config.ai.api_key,
         ollama_url: config.ai.refiner_ollama_url || config.ai.ollama_url,
-        ollama_model: config.ai.refiner_model || currentModel,
-        api_model: config.ai.refiner_model || currentModel,
+        api_model: config.ai.refiner_api_model || currentModel,
+        ollama_model: config.ai.refiner_ollama_model || currentModel,
       };
       
       const result = await testAIConnection(refinerConfig);
@@ -204,45 +197,20 @@ export const AISettings: React.FC = () => {
       : config.ai.ollama_model || '(未指定)';
   };
 
-  const handleCustomRefinerToggle = (enabled: boolean) => {
+  const handleCustomQualityCheckToggle = (enabled: boolean) => {
     if (!config) return;
     
-    setCustomRefiner(enabled);
+    setCustomQualityCheck(enabled);
     
     if (enabled) {
-      // カスタム設定を有効化：現在のモデルをコピー
-      let currentModel = config.ai.mode === 'api' 
-        ? config.ai.api_model 
-        : config.ai.ollama_model;
-      
-    // 🔧 修正: Ollamaモードで無効なモデルの場合、有効なモデルを選択
-    if (config.ai.mode === 'ollama') {
-      const isValidModel = llmModels.some(m => m.name === currentModel && m.capable);
-      
-      if (!isValidModel || !currentModel) {
-        // 有効な最初のモデルを取得
-        const firstValidModel = llmModels.find(m => m.capable);
-        currentModel = firstValidModel?.name || '';
-        
-        console.warn('無効なモデルが検出されたため、自動修正しました:', currentModel);
-      }
-    }
-    
-    // 🔧 修正: APIモードで空の場合もデフォルト値を設定
-    if (config.ai.mode === 'api' && !currentModel) {
-      currentModel = 'gpt-4o-mini';
-    }
-
-
+      // カスタム設定を有効化
       setConfig({
         ...config,
         ai: {
-        ...config.ai,
-        refiner_mode: null,
-        refiner_model: null,
-        refiner_api_key: null,
-        refiner_ollama_url: null
-        }
+          ...config.ai,
+          quality_check_api_model: config.ai.mode === 'api' ? 'gpt-4o-mini' : config.ai.quality_check_api_model,
+          quality_check_ollama_model: config.ai.mode === 'ollama' ? (llmModels.find(m => m.capable)?.name || '') : config.ai.quality_check_ollama_model
+         }
       });
     } else {
       // カスタム設定を無効化
@@ -250,8 +218,56 @@ export const AISettings: React.FC = () => {
         ...config,
         ai: {
           ...config.ai,
+          quality_mode: null,
+          quality_check_api_model: undefined,
+          quality_check_ollama_model: undefined,
+          quality_check_api_key: null,
+          quality_check_ollama_url: null
+        }
+      });
+    }
+  };
+
+  const handleCustomRefinerToggle = (enabled: boolean) => {
+    if (!config) return;
+    
+    setCustomRefiner(enabled);
+    
+    if (enabled) {
+      let currentModel = config.ai.mode === 'api' 
+        ? config.ai.api_model 
+        : config.ai.ollama_model;
+      
+      if (config.ai.mode === 'ollama') {
+        const isValidModel = llmModels.some(m => m.name === currentModel && m.capable);
+        
+        if (!isValidModel || !currentModel) {
+          const firstValidModel = llmModels.find(m => m.capable);
+          currentModel = firstValidModel?.name || '';
+        }
+      }
+      
+      if (config.ai.mode === 'api' && !currentModel) {
+        currentModel = 'gpt-4o-mini';
+      }
+
+      setConfig({
+        ...config,
+        ai: {
+          ...config.ai,
+          refiner_mode: config.ai.mode,
+          refiner_api_model: config.ai.mode === 'api' ? config.ai.api_model : config.ai.refiner_api_model,
+          refiner_ollama_model: config.ai.mode === 'ollama' ? config.ai.ollama_model : config.ai.refiner_ollama_model
+        }
+      });
+    } else {
+      setConfig({
+        ...config,
+        ai: {
+          ...config.ai,
           refiner_mode: null,
-          refiner_model: null,
+          refiner_api_model: undefined,
+          refiner_ollama_model: undefined,
           refiner_api_key: null,
           refiner_ollama_url: null
         }
@@ -259,7 +275,7 @@ export const AISettings: React.FC = () => {
     }
   };
 
-  if (!config) return <div>Loading...</div>;
+  if (!config) return <div className="ai-settings">Loading...</div>;
 
   return (
     <div className="ai-settings">
@@ -273,13 +289,16 @@ export const AISettings: React.FC = () => {
       {!loadingModels && !ollamaAvailable && (
         <div className="warning-box">
           ⚠️ Ollamaが接続できません。Local AIモードを使用する場合は、Ollamaを起動してください。
-          <button onClick={loadOllamaModels} className="btn-small">🔄 再読込</button>
+          <button onClick={loadOllamaModels} className="btn-secondary" style={{marginLeft: '12px'}}>🔄 再読込</button>
         </div>
       )}
 
       {/* 基本モデル設定 */}
       <div className="settings-section">
         <h3>基本モデル選択</h3>
+        <small style={{display: 'block', marginBottom: '12px', color: '#6b7280'}}>
+          推奨：14B〜32Bクラス（トリプレット抽出用）
+        </small>
 
         {/* Local AI */}
         <div className="radio-group">
@@ -302,15 +321,23 @@ export const AISettings: React.FC = () => {
               disabled={config.ai.mode !== 'ollama'}
             >
               {!config.ai.ollama_model && <option value="">モデルを選択...</option>}
-              {llmModels.map(model => (
+              {llmModels.map(model => {
+              // Base用の表示ロジック
+              const isRecommended = model.recommended_for_base;
+              const displayText = isRecommended 
+                ? `${model.name} (${model.size}GB) ✅ 推奨`
+                : `${model.name} (${model.size}GB) ⚠️ 性能不足`;
+    
+              return (
                 <option 
                   key={model.name} 
                   value={model.name}
-                  disabled={!model.capable}
+                  disabled={!model.recommended_for_base}
                 >
-                  {model.name} ({model.size}GB) {model.capable ? '✅' : '⚠️ 能力不足'}
+                  {displayText}
                 </option>
-              ))}
+                  );
+              })}
             </select>
           ) : (
             <select disabled>
@@ -338,7 +365,6 @@ export const AISettings: React.FC = () => {
             placeholder="gpt-4o-mini"
             disabled={config.ai.mode !== 'api'}
           />
-          <small>GPT-4o-mini以上を推奨</small>
         </div>
 
         <div className="form-group">
@@ -352,17 +378,140 @@ export const AISettings: React.FC = () => {
           />
         </div>
 
-        {/* 接続テスト（APIモードのみ） */}
+        {/* 接続テスト */}
         {config.ai.mode === 'api' && (
-          <button onClick={handleTestAI} disabled={testingAI}>
-            {testingAI ? '確認中...' : '🔐 API接続確認'}
-          </button>
+          <div className="test-button-row">
+            <button onClick={handleTestAI} disabled={testingAI}>
+              {testingAI ? '確認中...' : '🔍 API接続確認'}
+            </button>
+          </div>
         )}
 
-        {/* Ollamaモードの場合は接続済みメッセージ */}
         {config.ai.mode === 'ollama' && ollamaAvailable && (
           <div className="success-box">
             ✅ Ollama接続済み 🦙
+          </div>
+        )}
+      </div>
+
+      {/* 品質チェック専用モデル設定 */}
+      <div className="settings-section">
+        <h3>品質チェック専用モデル（推奨：軽量モデル）</h3>
+        
+        <label className="toggle-label">
+          <input 
+            type="checkbox"
+            checked={customQualityCheck}
+            onChange={(e) => handleCustomQualityCheckToggle(e.target.checked)}
+          />
+          <strong>基本モデルとは別のモデルを使用する</strong>
+        </label>
+        <small className="hint-text">
+          💡 品質チェックは7B〜8Bクラスの軽量モデルで十分です。<br/>
+          未設定の場合は基本モデルと同じものを使用します。
+        </small>
+
+        {!customQualityCheck ? (
+          <div className="readonly-refiner">
+            <p className="info-text">📌 基本モデルと同じ設定を使用します</p>
+            <div className="info-box">
+              <p><strong>モード:</strong> {config.ai.mode === 'api' ? '🌐 API' : '🏠 Local AI'}</p>
+              <p><strong>モデル:</strong> {getCurrentModel()}</p>
+            </div>
+          </div>
+        ) : (
+          <div className="custom-config">
+            {/* Quality Check Local AI */}
+            <div className="radio-group">
+              <label>
+                <input
+                  type="radio"
+                  name="quality-mode"
+                  value="ollama"
+                  checked={config.ai.quality_mode === 'ollama'}
+                  onChange={(e) => handleInputChange('ai', 'quality_mode', e.target.value)}
+                  disabled={!ollamaAvailable || llmModels.length === 0}
+                />
+                🏠 Local AI
+              </label>
+
+                            {ollamaAvailable && llmModels.length > 0 ? (
+                <select
+                  value={config.ai.quality_check_ollama_model || ''}
+                  onChange={(e) => handleInputChange('ai', 'quality_check_ollama_model', e.target.value)}
+                  disabled={config.ai.quality_mode !== 'ollama'}
+                >
+                  {!config.ai.quality_check_ollama_model && <option value="">モデルを選択...</option>}
+                  {llmModels.map(model => {
+                    const isRecommended = model.recommended_for_quality;
+                    const label = isRecommended 
+                      ? `${model.name} (${model.size}GB) ✅ 最適`
+                      : `${model.name} (${model.size}GB) ⚠️ 性能不足`;
+                    
+                    return (
+                      <option 
+                        key={model.name} 
+                        value={model.name}
+                        disabled={!model.capable}
+                      >
+                        {label}
+                      </option>
+                    );
+                  })}
+                </select>
+              ) : (
+                <select disabled>
+                  <option>❌ Ollamaモデルが見つかりません</option>
+                </select>
+              )}
+            </div>
+
+            {/* Quality Check API */}
+            <div className="radio-group">
+              <label>
+                <input
+                  type="radio"
+                  name="quality-mode"
+                  value="api"
+                  checked={config.ai.quality_mode === 'api'}
+                  onChange={(e) => handleInputChange('ai', 'quality_mode', e.target.value)}
+                />
+                🌐 API
+              </label>
+              <input
+                type="text"
+                value={config.ai.quality_check_api_model || ''}
+                onChange={(e) => handleInputChange('ai', 'quality_check_api_model', e.target.value)}
+                placeholder="gpt-4o-mini"
+                disabled={config.ai.quality_mode !== 'api'}
+              />
+            </div>
+
+            {config.ai.quality_mode === 'api' && (
+              <div className="form-group">
+                <label>🔑 APIキー（オプション）:</label>
+                <input
+                  type="password"
+                  value={config.ai.quality_check_api_key || ''}
+                  onChange={(e) => handleInputChange('ai', 'quality_check_api_key', e.target.value)}
+                  placeholder="空欄なら基本モデルと同じキーを使用"
+                />
+              </div>
+            )}
+
+            {config.ai.quality_mode === 'api' && (
+              <div className="test-button-row">
+                <button onClick={handleTestQualityCheck} disabled={testingQualityCheck}>
+                  {testingQualityCheck ? '確認中...' : '🔍 品質チェック接続確認'}
+                </button>
+              </div>
+            )}
+
+            {config.ai.quality_mode === 'ollama' && ollamaAvailable && (
+              <div className="success-box">
+                ✅ Ollama接続済み 🦙
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -381,11 +530,10 @@ export const AISettings: React.FC = () => {
         </label>
         <small className="hint-text">
           基本モデルより下位のAIを指定すると精度が下がります。<br/>
-          Criticモデルは常に基本モデルと同じものを使用します（変更不可）
+          Criticモデルは常にクオリティチェックモデルと同じものを使用します（変更不可）
         </small>
 
         {!customRefiner ? (
-          // 追従モード（読み取り専用表示）
           <div className="readonly-refiner">
             <p className="info-text">📌 基本モデルと同じ設定を使用します</p>
             <div className="info-box">
@@ -394,10 +542,7 @@ export const AISettings: React.FC = () => {
             </div>
           </div>
         ) : (
-          // カスタム設定モード
           <div className="custom-config">
-            <div className="warning-box">
-            </div>
 
             {/* Refiner Local AI */}
             <div className="radio-group">
@@ -412,23 +557,29 @@ export const AISettings: React.FC = () => {
                 />
                 🏠 Local AI
               </label>
-              
               {ollamaAvailable && llmModels.length > 0 ? (
                 <select
-                  value={config.ai.refiner_model || ''}
-                  onChange={(e) => handleInputChange('ai', 'refiner_model', e.target.value)}
+                  value={config.ai.refiner_ollama_model || ''}
+                  onChange={(e) => handleInputChange('ai', 'refiner_ollama_model', e.target.value)}
                   disabled={config.ai.refiner_mode !== 'ollama'}
                 >
-                  {!config.ai.refiner_model && <option value="">モデルを選択...</option>}
-                  {llmModels.map(model => (
-                    <option 
-                      key={model.name} 
-                      value={model.name}
-                      disabled={!model.capable}
-                    >
-                      {model.name} ({model.size}GB) {model.capable ? '✅' : '⚠️'}
-                    </option>
-                  ))}
+                  {!config.ai.refiner_ollama_model && <option value="">モデルを選択...</option>}
+                  {llmModels.map(model => {
+                    const isRecommended = model.recommended_for_base;
+                    const label = isRecommended 
+                      ? `${model.name} (${model.size}GB) ✅ 推奨`
+                      : `${model.name} (${model.size}GB) ⚠️ 性能不足`;
+                    
+                    return (
+                      <option 
+                        key={model.name} 
+                        value={model.name}
+                        disabled={!model.recommended_for_base}
+                      >
+                        {label}
+                      </option>
+                    );
+                  })}
                 </select>
               ) : (
                 <select disabled>
@@ -451,9 +602,9 @@ export const AISettings: React.FC = () => {
               </label>
               <input
                 type="text"
-                value={config.ai.refiner_model || ''}
-                onChange={(e) => handleInputChange('ai', 'refiner_model', e.target.value)}
-                placeholder="claude-sonnet-4-20250514（上位モデル推奨）"
+                value={config.ai.refiner_api_model || ''}
+                onChange={(e) => handleInputChange('ai', 'refiner_api_model', e.target.value)}
+                placeholder="gpt-4o-mini"
                 disabled={config.ai.refiner_mode !== 'api'}
               />
             </div>
@@ -470,14 +621,14 @@ export const AISettings: React.FC = () => {
               </div>
             )}
 
-            {/* Refiner接続テスト（APIモードのみ） */}
             {config.ai.refiner_mode === 'api' && (
-              <button onClick={handleTestRefiner} disabled={testingRefiner}>
-                {testingRefiner ? '確認中...' : '🔐 Refiner接続確認'}
-              </button>
+              <div className="test-button-row">
+                <button onClick={handleTestRefiner} disabled={testingRefiner}>
+                  {testingRefiner ? '確認中...' : '🔍 Refiner接続確認'}
+                </button>
+              </div>
             )}
 
-            {/* Ollamaモードの場合は接続済みメッセージ */}
             {config.ai.refiner_mode === 'ollama' && ollamaAvailable && (
               <div className="success-box">
                 ✅ Ollama接続済み 🦙
@@ -487,36 +638,10 @@ export const AISettings: React.FC = () => {
         )}
       </div>
 
-      {/* 図表解析 */}
-      <div className="settings-section">
-        <h3>🖼️ 図表解析モデル</h3>
-        
-        {ollamaAvailable && visionModels.length > 0 ? (
-          <div className="form-group">
-            <select
-              value={config.ai.vision_model || ''}
-              onChange={(e) => handleInputChange('ai', 'vision_model', e.target.value)}
-            >
-              {visionModels.map(model => (
-                <option key={model.name} value={model.name}>
-                  {model.name} ({model.size}GB)
-                </option>
-              ))}
-            </select>
-            <small>図表の解析に使用</small>
-          </div>
-        ) : (
-          <div className="warning-box">
-            ⚠️ Visionモデルが見つかりません。
-            <code>ollama pull granite3.2-vision</code> でインストールしてください。
-          </div>
-        )}
-      </div>
-
       {/* 保存ボタン */}
       <div className="actions">
-        <button onClick={handleSave} disabled={loading} className="btn-primary">
-          {loading ? '保存中...' : ' 設定を保存'}
+        <button onClick={handleSave} disabled={loading}>
+          {loading ? '保存中...' : '💾 設定を保存'}
         </button>
       </div>
     </div>

@@ -17,16 +17,6 @@ export interface AdvancedConfig {
   self_rag_enabled: boolean;
   self_rag_threshold: number;
   
-  // Critic（読み取り専用、メインに追従）
-  self_rag_critic_model: string;
-  self_rag_critic_mode: string;
-  
-  // Refiner（編集可能）
-  self_rag_refiner_model: string;
-  self_rag_refiner_mode: string;
-  self_rag_refiner_ollama_url: string | null;
-  self_rag_refiner_api_key: string | null;
-  
   self_rag_max_retries: number;
   self_rag_token_budget: number;
 }
@@ -41,20 +31,40 @@ export interface Config {
   ai: {
     mode: 'api' | 'ollama';  
     ollama_url: string; 
-    // モード別のモデル名
+    // 基本モデル
     api_model: string;
     ollama_model: string;
-    // 後方互換性（非推奨）
-    llm_model: string;
-
     api_key: string;
-    vision_model: string; 
-        
-    // Refiner専用設定
-    refiner_mode: string | null;
-    refiner_ollama_url: string | null;
-    refiner_api_key: string | null;
-    refiner_model: string | null;
+
+    // クオリティチェックモデル
+    quality_mode?: 'api' | 'ollama' | null; // nullなら基本mode追従
+    quality_check_api_model?: string;       // API専用モデル名（空なら api_model）
+    quality_check_ollama_model?: string;    // Local専用モデル名（空なら ollama_model）
+    quality_check_api_key?: string | null;
+    quality_check_ollama_url?: string | null;
+    // Refinerモデル
+    refiner_mode?: 'api' | 'ollama' | null;
+    refiner_api_model?: string;             // ← 追加
+    refiner_ollama_model?: string;          // ← 追加
+    refiner_api_key?: string | null; 
+    refiner_ollama_url?: string | null;
+  };
+    parameters: {
+    entity_linking_threshold: number;
+    retrieval_chunk_size: number;
+    retrieval_chunk_overlap: number;
+    graph_chunk_size: number;
+    graph_chunk_overlap: number;
+    relation_compat_threshold: number;
+    final_weight_cutoff: number;
+    max_triplets_per_chunk: number;
+  };
+  
+  self_rag: {
+    enable: boolean;
+    confidence_threshold: number;
+    max_retries: number;
+    token_budget: number;
   };
   processing: {
     input_dir: string;
@@ -70,16 +80,25 @@ export interface AIStatus {
   ollama_available: boolean;
   ollama_url: string;
   api_configured: boolean;
-  models: {
-    llm: string;
-    vision: string;
+  models?: {      
+    api: string;
+    ollama: string;
+  };
+  task_models: {
+    triplet_extraction: string;
+    quality_check: string;
+    self_rag_critic: string;
+    self_rag_refiner: string;
   };
 }
+
 export interface OllamaModel {
   name: string;
   size: number;
   capable: boolean;
   is_vision: boolean;
+  recommended_for_base?: boolean;
+  recommended_for_quality?: boolean;
 }
 export interface ProcessingStatus {
   total: number;

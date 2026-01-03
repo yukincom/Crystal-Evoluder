@@ -1,160 +1,323 @@
 .ai-settings {
-  padding: 20px;
+  max-width: 800px;
+  margin: 0 auto;
 }
 
 .ai-settings h2 {
-  margin-bottom: 30px;
-  color: #333;
+  font-size: 24px;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 24px;
 }
 
+/* 設定セクション */
 .settings-section {
-  margin-bottom: 30px;
-  padding: 20px;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  background: #f9f9f9;
+  background: #ccc;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: none;
 }
 
 .settings-section h3 {
-  margin-bottom: 15px;
-  color: #555;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #e5e7eb;
 }
 
+/* ラジオグループ */
 .radio-group {
-  margin-bottom: 15px;
+  margin-bottom: 16px;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+  padding: 12px;
+  background: #f9fafb;
+  border-radius: 8px;
+  transition: background 0.2s;
+}
+
+.radio-group:hover {
+  background: #f3f4f6;
 }
 
 .radio-group label {
   display: flex;
   align-items: center;
-  gap: 5px;
-  font-weight: bold;
+  gap: 8px;
+  font-weight: 500;
+  font-size: 14px;
+  color: #374151;
+  cursor: pointer;
+  min-width: 100px;
 }
 
 .radio-group input[type="radio"] {
+  width: 18px;
+  height: 18px;
   margin: 0;
+  cursor: pointer;
+  accent-color: #4169e1;
 }
 
 .radio-group select,
-.radio-group input[type="text"] {
-  margin-left: 10px;
-  padding: 8px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
+.radio-group input[type="text"],
+.radio-group input[type="password"] {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
   font-size: 14px;
+  color: #1f2937;
+  background: white;
+  transition: all 0.2s;
+}
+
+.radio-group select:focus,
+.radio-group input:focus {
+  outline: none;
+  border-color: #4169e1;
+  box-shadow: 0 0 0 3px rgba(65, 105, 225, 0.1);
 }
 
 .radio-group select:disabled,
 .radio-group input:disabled {
-  background-color: #e9ecef;
-  opacity: 0.6;
+  background: #f3f4f6;
+  color: #9ca3af;
+  cursor: not-allowed;
+  border-color: #e5e7eb;
 }
 
+/* フォームグループ */
 .form-group {
-  margin-bottom: 15px;
+  margin-bottom: 20px;
 }
 
 .form-group label {
   display: block;
-  margin-bottom: 5px;
-  font-weight: bold;
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 8px;
 }
 
 .form-group input,
 .form-group select {
   width: 100%;
-  padding: 8px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
   font-size: 14px;
+  color: #1f2937;
+  background: white;
+  transition: all 0.2s;
 }
 
-.form-group input:disabled {
-  background-color: #e9ecef;
-  opacity: 0.6;
+.form-group input:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: #4169e1;
+  box-shadow: 0 0 0 3px rgba(65, 105, 225, 0.1);
 }
 
+.form-group input:disabled,
+.form-group select:disabled {
+  background: #f3f4f6;
+  color: #9ca3af;
+  cursor: not-allowed;
+  border-color: #e5e7eb;
+}
+
+/* ヒントテキスト */
 small {
   display: block;
-  margin-top: 5px;
-  color: #666;
+  margin-top: 6px;
+  color: #6b7280;
   font-size: 12px;
+  line-height: 1.5;
 }
 
+/* トグルラベル */
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: #f9fafb;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+  margin-bottom: 16px;
+}
+
+.toggle-label:hover {
+  background: #f3f4f6;
+}
+
+.toggle-label input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  accent-color: #4169e1;
+}
+
+.toggle-label strong {
+  font-size: 14px;
+  color: #374151;
+}
+
+.hint-text {
+  display: block;
+  margin-top: 8px;
+  padding: 12px;
+  background: #fef3c7;
+  border-left: 4px solid #f59e0b;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #92400e;
+}
+
+/* カスタム設定エリア */
+.custom-config {
+  margin-top: 16px;
+  padding: 20px;
+  background: #f9fafb;
+  border: 2px dashed #d1d5db;
+  border-radius: 8px;
+}
+
+.readonly-refiner {
+  margin-top: 16px;
+  padding: 20px;
+  background: #f9fafb;
+  border-radius: 8px;
+}
+
+.info-text {
+  font-size: 14px;
+  color: #4b5563;
+  margin-bottom: 12px;
+}
+
+/* テストボタン行 */
+.test-button-row {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e5e7eb;
+}
+
+/* セクション内ボタン */
 .settings-section button {
   padding: 10px 20px;
-  background: #006eff;
+  background: #3b82f6;
   color: white;
   border: none;
-  border-radius: 4px;
-  cursor: pointer;
+  border-radius: 6px;
   font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
-.settings-section button:hover {
-  background: #218838;
+.settings-section button:hover:not(:disabled) {
+  background: #2563eb;
 }
 
 .settings-section button:disabled {
-  background: #6c757d;
+  background: #d1d5db;
+  color: #9ca3af;
   cursor: not-allowed;
 }
 
+/* メッセージボックス */
+.info-box {
+  padding: 12px 16px;
+  background: #dbeafe;
+  border-left: 4px solid #3b82f6;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #1e40af;
+  margin-bottom: 16px;
+}
+
+.success-box {
+  padding: 12px 16px;
+  background: #d1fae5;
+  border-left: 4px solid #10b981;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #065f46;
+  margin: 12px 0;
+}
+
+.warning-box {
+  padding: 12px 16px;
+  background: #fef3c7;
+  border-left: 4px solid #f59e0b;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #92400e;
+  margin-bottom: 16px;
+}
+
+/* 保存ボタン */
 .actions {
   text-align: center;
-  margin-top: 30px;
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid #e5e7eb;
 }
 
 .actions button {
-  padding: 12px 24px;
-  background: #00a2ff;
+  padding: 14px 32px;
+  background: #10b981;
   color: white;
   border: none;
-  border-radius: 4px;
-  cursor: pointer;
+  border-radius: 8px;
   font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 200px;
 }
 
-.actions button:hover {
-  background: #0056b3;
+.actions button:hover:not(:disabled) {
+  background: #059669;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
 }
 
 .actions button:disabled {
-  background: #6c757d;
+  background: #d1d5db;
+  color: #9ca3af;
   cursor: not-allowed;
-}
-.test-button-row {
-  margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid #eee;
+  transform: none;
 }
 
+/* セカンダリボタン */
 .btn-secondary {
-  background: #6c757d;
+  padding: 10px 20px;
+  background: #6b7280;
   color: white;
   border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
-  font-size: 0.9rem;
+  transition: all 0.2s;
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: #5a6268;
+  background: #4b5563;
 }
 
 .btn-secondary:disabled {
-  opacity: 0.6;
+  background: #d1d5db;
+  color: #9ca3af;
   cursor: not-allowed;
-}
-.success-box {
-  padding: 12px 24px;
-  background: #d4edda;
-  border-left: 4px solid #28a745;
-  border-radius: 4px;
-  margin: 0.5rem 0;
-  color: #155724;
 }
