@@ -12,7 +12,7 @@ class TripletExtractor:
     
     Modes:
         - "api": OpenAI API（gpt-4o-mini, claude-3.5-sonnet等）
-        - "ollama": Ollama（llama3.1:70b等）
+        - "ollama": Ollama（llama3.1:14B等）
         - "local": Hugging Face Transformers（Rebel, Qwen2.5等）
     """
     
@@ -29,8 +29,8 @@ class TripletExtractor:
             mode: "api" または "local"
             model_name: 
                 - API: "gpt-4o-mini", "claude-3.5-sonnet"
-                - Ollama: "llama3.1:70b", "qwen2.5:32b
-                - Local: "Babelscape/rebel-large", "Qwen/Qwen2.5-32B"
+                - Ollama: "llama3.1:14B", "qwen2.5:14B"
+                - Local: "Babelscape/rebel-large", "Qwen/Qwen2.5-14B"
             api_key: OpenAI API key（API mode時）
             device: "mps", "cuda", "cpu"
             ollama_url: Ollama URL
@@ -40,7 +40,7 @@ class TripletExtractor:
         self.ollama_url = ollama_url 
         
         if mode == "ollama":  
-            print(f"🖥️  Ollama mode: {model_name} at {ollama_url}")
+            print(f"🏠  Ollama mode: {model_name} at {ollama_url}")
             self._check_ollama()
 
         if mode == "local":
