@@ -7,7 +7,7 @@ from typing import List, Dict, Any, Optional, Tuple
 
 from llama_index.core import Document
 
-from shared import ContentLevelDuplicateChecker, load_and_validate_paths
+from ..shared import ContentLevelDuplicateChecker, load_and_validate_paths
 
 class DocumentProcessor:
     """ドキュメントのロードと前処理を担当"""
